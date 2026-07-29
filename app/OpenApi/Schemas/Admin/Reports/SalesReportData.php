@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\OpenApi\Schemas\Admin\Reports;
+
+use OpenApi\Attributes as OA;
+
+#[OA\Schema(
+    schema: 'SalesReportData',
+    required: ['filters', 'summary', 'buckets', 'rows'],
+    properties: [
+        new OA\Property(property: 'filters', ref: '#/components/schemas/ReportFiltersEcho'),
+        new OA\Property(property: 'summary', ref: '#/components/schemas/SalesReportSummary'),
+        new OA\Property(property: 'buckets', type: 'array',
+            items: new OA\Items(ref: '#/components/schemas/SalesReportBucket')),
+        new OA\Property(property: 'rows', type: 'array',
+            items: new OA\Items(ref: '#/components/schemas/SalesReportRow')),
+    ],
+    type: 'object',
+)]
+final class SalesReportData
+{
+    // Documentation-only.
+}
