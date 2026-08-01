@@ -48,6 +48,7 @@ final class PaymentInitiateResponseResource extends PaymentResource
             $base['session_id'] = $this->session['session_id'] ?? null;
             $base['payment_reference'] = $this->session['payment_reference'] ?? null;
             $base['payment_token'] = $this->session['payment_token'] ?? null;
+            $base['client_secret'] = $this->session['client_secret'] ?? null;
         }
 
         return $base;

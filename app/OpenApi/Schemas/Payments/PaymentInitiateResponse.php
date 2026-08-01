@@ -18,6 +18,7 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'session_id', type: 'string', example: 'sdk_token_abc123', nullable: true),
                 new OA\Property(property: 'payment_reference', type: 'string', example: 'f1ee2c0b-1f7d-4b8a-8c61-8f1a9d2e5e02', nullable: true),
                 new OA\Property(property: 'payment_token', type: 'string', nullable: true),
+                new OA\Property(property: 'client_secret', type: 'string', example: 'pi_abc123_secret_xyz', nullable: true),
                 new OA\Property(property: 'order', type: 'object', nullable: true),
             ]),
         ]),

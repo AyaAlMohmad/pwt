@@ -87,6 +87,7 @@ final class PaymentsController extends Controller
                 'session_id' => $result->sessionId,
                 'payment_reference' => $result->paymentReference,
                 'payment_token' => $result->paymentToken,
+                'client_secret' => $result->clientSecret,
             ];
         }
 

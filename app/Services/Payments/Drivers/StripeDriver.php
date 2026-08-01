@@ -22,8 +22,11 @@ use Stripe\Webhook;
 /**
  * Stripe gateway driver.
  *
- * Uses Stripe Checkout Sessions for the initiate() (redirect) flow and
- * Stripe PaymentIntents for the createSession() (embedded) flow.
+ * initiate() creates a hosted Checkout Session (payment_url) and also
+ * fetches its linked PaymentIntent so the client can choose to use the
+ * redirect URL or the client_secret for an embedded flow.
+ *
+ * createSession() is reserved for a direct PaymentIntent (embedded) flow.
  *
  * Webhooks verified with Stripe-Signature header using the endpoint secret.
  *
@@ -47,8 +50,8 @@ final class StripeDriver implements PaymentGateway
     }
 
     /**
-     * Create a Stripe Checkout Session (hosted checkout) and return the
-     * redirect URL plus the session id as the gateway transaction id.
+     * Create a hosted Stripe Checkout Session for the payment_url, then
+     * retrieve its PaymentIntent so the client_secret is also available.
      */
     public function initiate(Payment $payment, Order $order, array $context = []): PaymentInitiationResult
     {
@@ -56,37 +59,40 @@ final class StripeDriver implements PaymentGateway
 
         $amountCents = $this->toCents($payment->amount, $payment->currency);
         $currency = strtolower($payment->currency);
-
         $lineItems = $this->buildLineItems($order, $amountCents, $currency);
 
-        $payload = [
-            'payment_method_types' => ['card'],
-            'line_items' => $lineItems,
+        /** @var Session $session */
+        $session = Session::create([
             'mode' => 'payment',
             'client_reference_id' => $payment->public_id,
+            'customer_email' => $order->customer_email ?? $order->user->email ?? null,
+            'line_items' => $lineItems,
+            'success_url' => (string) $this->setting('return_url', ''),
+            'cancel_url' => (string) $this->setting('cancel_url', ''),
             'metadata' => [
                 'payment_public_id' => $payment->public_id,
                 'order_id' => $order->id,
                 'order_public_id' => $order->public_id,
             ],
-            'success_url' => $context['return_url'] ?? (string) $this->setting('return_url', ''),
-            'cancel_url' => $context['cancel_url'] ?? (string) $this->setting('cancel_url', ''),
-        ];
+        ]);
 
-        /** @var Session $session */
-        $session = Session::create($payload);
+        $paymentIntentId = (string) ($session->payment_intent ?? '');
+
+        /** @var PaymentIntent $intent */
+        $intent = $paymentIntentId !== '' ? PaymentIntent::retrieve($paymentIntentId) : null;
 
         return new PaymentInitiationResult(
             clientPaymentUrl: (string) $session->url,
-            gatewayTransactionId: (string) $session->id,
-            gatewayReference: (string) ($session->payment_intent ?? $session->subscription ?? ''),
+            gatewayTransactionId: $paymentIntentId !== '' ? $paymentIntentId : (string) $session->id,
+            gatewayReference: $intent !== null ? (string) $intent->client_secret : '',
             expiresAt: $session->expires_at !== null
                 ? CarbonImmutable::createFromTimestamp($session->expires_at)
                 : CarbonImmutable::now()->addMinutes((int) config('payment.initiated_ttl_minutes', 30)),
             sessionId: (string) $session->id,
-            paymentReference: $payment->public_id,
-            paymentToken: null,
-            raw: $session->toArray(),
+            paymentReference: $paymentIntentId !== '' ? $paymentIntentId : (string) $session->id,
+            paymentToken: $intent !== null ? (string) $intent->client_secret : null,
+            clientSecret: $intent !== null ? (string) $intent->client_secret : null,
+            raw: $intent !== null ? $intent->toArray() : $session->toArray(),
         );
     }
 

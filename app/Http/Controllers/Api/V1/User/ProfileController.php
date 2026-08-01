@@ -16,6 +16,7 @@ use App\Support\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use OpenApi\Attributes as OA;
 
 final class ProfileController extends Controller
@@ -49,7 +50,7 @@ final class ProfileController extends Controller
     #[OA\Patch(
         path: '/api/v1/me',
         operationId: 'meUpdate',
-        description: 'Partial update of the authenticated profile. Changing `email` or `phone` requires `current_password`. Phone must be unique and is normalised to E.164 before storage.',
+        description: 'Partial update of the authenticated profile. Changing `email`, `phone`, or `password` requires `current_password`. Phone must be unique and is normalised to E.164 before storage.',
         summary: 'Update authenticated profile',
         security: [['sanctum' => []]],
         requestBody: new OA\RequestBody(
@@ -81,6 +82,12 @@ final class ProfileController extends Controller
             'company_name' => $request->input('company_name'),
         ], static fn ($v) => $v !== null);
 
+        // Handle password change
+        $newPassword = null;
+        if ($request->has('password') && $request->filled('password')) {
+            $newPassword = Hash::make($request->input('password'));
+        }
+
         if ($request->has('email')) {
             $changes['email'] = $request->input('email');
         }
@@ -93,9 +100,15 @@ final class ProfileController extends Controller
             $changes['phone'] = $request->input('phone');
         }
 
-        if ($changes !== []) {
-            DB::transaction(function () use ($user, $changes): void {
-                $user->fill($changes)->save();
+        if ($changes !== [] || $newPassword !== null) {
+            DB::transaction(function () use ($user, $changes, $newPassword): void {
+                if ($newPassword !== null) {
+                    $user->password = $newPassword;
+                }
+                if ($changes !== []) {
+                    $user->fill($changes);
+                }
+                $user->save();
             });
         }
 

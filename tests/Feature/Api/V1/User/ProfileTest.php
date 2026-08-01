@@ -213,6 +213,79 @@ describe('PATCH /api/v1/me', function (): void {
         $message = (string) $response->json('errors.email.0');
         expect($message)->not->toContain('must be a valid email');
     });
+
+    it('updates password with correct current_password and confirmation', function (): void {
+        ['user' => $user, 'token' => $token] = makeAuthedCustomer();
+
+        $response = $this->withHeader('Authorization', "Bearer $token")
+            ->patchJson('/api/v1/me', [
+                'password' => 'NewPassword123',
+                'password_confirmation' => 'NewPassword123',
+                'current_password' => 'Password1!',
+            ]);
+
+        $response->assertOk();
+
+        // Verify password was changed
+        $user->refresh();
+        expect(Hash::check('NewPassword123', $user->password))->toBeTrue()
+            ->and(Hash::check('Password1!', $user->password))->toBeFalse();
+    });
+
+    it('returns 422 ERR_VALIDATION when changing password without current_password', function (): void {
+        ['token' => $token] = makeAuthedCustomer();
+
+        $response = $this->withHeader('Authorization', "Bearer $token")
+            ->patchJson('/api/v1/me', [
+                'password' => 'NewPassword123',
+                'password_confirmation' => 'NewPassword123',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('code', 'ERR_VALIDATION');
+    });
+
+    it('returns 422 ERR_VALIDATION when password confirmation does not match', function (): void {
+        ['token' => $token] = makeAuthedCustomer();
+
+        $response = $this->withHeader('Authorization', "Bearer $token")
+            ->patchJson('/api/v1/me', [
+                'password' => 'NewPassword123',
+                'password_confirmation' => 'DifferentPassword123',
+                'current_password' => 'Password1!',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('code', 'ERR_VALIDATION');
+    });
+
+    it('returns 422 ERR_VALIDATION when password is too short', function (): void {
+        ['token' => $token] = makeAuthedCustomer();
+
+        $response = $this->withHeader('Authorization', "Bearer $token")
+            ->patchJson('/api/v1/me', [
+                'password' => 'Short1',
+                'password_confirmation' => 'Short1',
+                'current_password' => 'Password1!',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('code', 'ERR_VALIDATION');
+    });
+
+    it('returns 422 ERR_VALIDATION when current_password is incorrect', function (): void {
+        ['token' => $token] = makeAuthedCustomer();
+
+        $response = $this->withHeader('Authorization', "Bearer $token")
+            ->patchJson('/api/v1/me', [
+                'password' => 'NewPassword123',
+                'password_confirmation' => 'NewPassword123',
+                'current_password' => 'WrongPassword1!',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('code', 'ERR_VALIDATION');
+    });
 });
 
 /*

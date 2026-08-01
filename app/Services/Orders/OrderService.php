@@ -251,6 +251,7 @@ final class OrderService
                 'deliveryAddress.region',
                 'promotion',
                 'items',
+                'payments',
                 'user.addresses.country',
                 'user.addresses.region',
             ])

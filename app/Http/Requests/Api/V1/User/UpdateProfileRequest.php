@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
  * Request body for PATCH /api/v1/me.
  *
  * Partial profile update — every field is `sometimes`. Sensitive fields
- * (`email`, `phone`) require the current password to be re-supplied.
+ * (`email`, `phone`, `password`) require the current password to be re-supplied.
  */
 final class UpdateProfileRequest extends FormRequest
 {
@@ -85,8 +85,10 @@ final class UpdateProfileRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:20'],
             'locale' => ['sometimes', 'string', 'in:en,ar'],
             'company_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
+            'password_confirmation' => ['sometimes', 'nullable', 'string', 'min:8'],
             'current_password' => [
-                'required_with:email,phone_e164',
+                'required_with:email,phone_e164,password',
                 'nullable',
                 'string',
                 'current_password:sanctum',

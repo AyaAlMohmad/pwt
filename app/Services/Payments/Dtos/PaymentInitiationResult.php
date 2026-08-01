@@ -32,6 +32,7 @@ final readonly class PaymentInitiationResult
         public ?string $sessionId = null,
         public ?string $paymentReference = null,
         public ?string $paymentToken = null,
+        public ?string $clientSecret = null,
         public array $raw = [],
     ) {}
 }

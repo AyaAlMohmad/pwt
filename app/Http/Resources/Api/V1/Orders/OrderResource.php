@@ -77,6 +77,7 @@ class OrderResource extends JsonResource
             'cancelled_at' => $order->cancelled_at?->toIso8601String(),
             'cancellation_reason' => $order->cancellation_reason,
             'tracking_progress' => $order->status->trackingProgress(),
+            'payment_status' => $this->resolvePaymentStatus($order),
             'is_cancellable' => $order->is_cancellable,
         ];
     }
@@ -94,6 +95,19 @@ class OrderResource extends JsonResource
         }
 
         return $order->items()->count();
+    }
+
+    /**
+     * Latest non-cancelled payment status so the customer can see
+     * whether the payment has been captured, failed, etc.
+     */
+    private function resolvePaymentStatus(Order $order): ?string
+    {
+        $payment = $order->latestPayment();
+
+        return $payment !== null
+            ? $payment->status->value
+            : null;
     }
 
     /**

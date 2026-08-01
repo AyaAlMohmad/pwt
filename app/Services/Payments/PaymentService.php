@@ -438,17 +438,6 @@ final class PaymentService
                     'gateway_reference' => $payment->gateway_reference ?? $result->gatewayReference,
                 ])->save();
 
-                $order = $payment->order;
-                if ($order !== null && $order->status === OrderStatus::Pending) {
-                    $this->transitions->transition(
-                        $order,
-                        OrderStatus::Confirmed,
-                        OrderActorType::System,
-                        null,
-                        'Payment captured'.($result->eventId !== null ? ' (event '.$result->eventId.')' : ''),
-                    );
-                }
-
                 // Phase 11 — fire PaymentCaptured after commit.
                 $paymentId = (int) $payment->id;
                 $orderId = (int) $payment->order_id;

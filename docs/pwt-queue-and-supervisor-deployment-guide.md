@@ -11,15 +11,15 @@
 - Queue contains only valid jobs.
 - No expired stuck jobs.
 
-## 2. Why emails were all at once
+## 2. Why emails were sent at once
 
-When a default queue worker is running with a single job in the queue, it may start child processes. All workers may be started at the same time, therefore up to 4 workers and ~10% may send together. This is expected if many workers started at once.
+When a default queue worker is running, several jobs in the queue are active at a time, workers start at the same time, therefore up to 4 workers and ~10% may be sent together. This is expected if many workers started at the same time.
 
 ## 3. Why duplicate emails happen
 
 Possible reasons:
 
-- Slow queue caused issue.
+- Same job caused twice.
 - Retry configuration.
 - Asynchronous processing.
 - Expired job if job exceeds.
@@ -40,9 +40,8 @@ Possible reasons:
 php artisan queue:work --sleep=3 --tries=120 --timeout=120 --max-jobs=500 --max-time=3600
 ```
 
-- `sleep=3` reduces CPU polling.
-- `tries=120` retries failed jobs (not immediate).
-- `timeout=120` matches server/retry logic.
+- `sleep=3` reduces database polling.
+- `tries=120` reuses failed jobs.
 - `max-jobs=500` and `max-time=3600` restart worker periodically to avoid memory growth.
 
 ## 6. Supervisor configuration recommendations
@@ -60,7 +59,7 @@ php artisan queue:work --sleep=3 --tries=120 --timeout=120 --max-jobs=500 --max-
 - No duplicate emails.
 - All other queued jobs process as before; check `failed_jobs`.
 
-## 8. Failure incident
+## 8. Future incident
 
 If the API becomes slow:
 
