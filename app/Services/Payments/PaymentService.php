@@ -456,6 +456,18 @@ final class PaymentService
                         : null,
                 ])->save();
 
+                Log::warning('payment.failed', [
+                    'payment_id' => $payment->id,
+                    'order_id' => $payment->order_id,
+                    'user_id' => $payment->user_id,
+                    'gateway' => $payment->gateway,
+                    'gateway_transaction_id' => $payment->gateway_transaction_id,
+                    'gateway_reference' => $payment->gateway_reference,
+                    'amount' => $payment->amount,
+                    'currency' => $payment->currency,
+                    'failure_reason' => $payment->failure_reason,
+                ]);
+
                 // Phase 11 — fire PaymentFailed after commit.
                 $paymentId = (int) $payment->id;
                 $orderId = (int) $payment->order_id;

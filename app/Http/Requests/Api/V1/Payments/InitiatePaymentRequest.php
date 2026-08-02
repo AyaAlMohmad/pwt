@@ -41,6 +41,12 @@ final class InitiatePaymentRequest extends FormRequest
                 'payment_method' => strtolower(trim((string) $this->input('payment_method'))),
             ]);
         }
+
+        if (is_string($this->input('mode'))) {
+            $this->merge([
+                'mode' => strtolower(trim((string) $this->input('mode'))),
+            ]);
+        }
     }
 
     /**
@@ -65,6 +71,11 @@ final class InitiatePaymentRequest extends FormRequest
                 'required',
                 'string',
                 'in:'.implode(',', PaymentMethod::values()),
+            ],
+            'mode' => [
+                'nullable',
+                'string',
+                'in:checkout,payment_intent',
             ],
 
             // Forbidden — server-managed.

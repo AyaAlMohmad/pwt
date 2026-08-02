@@ -75,6 +75,12 @@ final class PaymentsController extends Controller
 
         $method = PaymentMethod::from((string) $request->validated('payment_method'));
         $idempotencyKey = $this->resolveIdempotencyKey($request);
+        $mode = $request->validated('mode', 'checkout');
+
+        // If mode is payment_intent, use createSession instead of initiate
+        if ($mode === 'payment_intent') {
+            return $this->handlePaymentIntentMode($request, $user, $order, $method, $idempotencyKey);
+        }
 
         [$payment, $replayed, $result] = $this->payments->initiate($user, $order, $method, $idempotencyKey);
         $payment->load('order');
@@ -94,6 +100,33 @@ final class PaymentsController extends Controller
         return ApiResponse::success(
             $resource->resolve($request),
             $message,
+            $replayed ? 200 : 201,
+        );
+    }
+
+    private function handlePaymentIntentMode(
+        InitiatePaymentRequest $request,
+        User $user,
+        Order $order,
+        PaymentMethod $method,
+        ?string $idempotencyKey,
+    ): JsonResponse {
+        [$payment, $session] = $this->payments->createSession($user, $order, $method, $idempotencyKey);
+        $payment->load('order');
+
+        $replayed = ! $payment->wasRecentlyCreated;
+
+        $resource = new PaymentInitiateResponseResource($payment);
+        $resource->session = [
+            'session_id' => $session->sessionId,
+            'payment_reference' => $session->paymentReference,
+            'payment_token' => $session->paymentToken,
+            'client_secret' => $session->paymentToken,
+        ];
+
+        return ApiResponse::success(
+            $resource->resolve($request),
+            $replayed ? __('payments.replay_session') : __('payments.session_created'),
             $replayed ? 200 : 201,
         );
     }
