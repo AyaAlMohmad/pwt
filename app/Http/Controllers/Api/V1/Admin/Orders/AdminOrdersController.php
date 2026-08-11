@@ -8,6 +8,7 @@ use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Admin\Orders\AddOrderNoteRequest;
 use App\Http\Requests\Api\V1\Admin\Orders\AdminCancelOrderRequest;
+use App\Http\Requests\Api\V1\Admin\Orders\CreateAdminOrderRequest;
 use App\Http\Requests\Api\V1\Admin\Orders\ListAdminOrdersRequest;
 use App\Http\Requests\Api\V1\Admin\Orders\ScheduleInstallationRequest;
 use App\Http\Requests\Api\V1\Admin\Orders\UpdateOrderStatusRequest;
@@ -18,6 +19,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Policies\OrderPolicy;
 use App\Services\Admin\AdminOrderService;
+use App\Services\Orders\OrderService;
 use App\Support\Http\ApiResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
@@ -40,7 +42,31 @@ final class AdminOrdersController extends Controller
 {
     public function __construct(
         private readonly AdminOrderService $service,
+        private readonly OrderService $orders,
     ) {}
+
+    public function store(CreateAdminOrderRequest $request): JsonResponse
+    {
+        $this->authorize('createAdmin', Order::class);
+
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $payload = $request->validated();
+        $targetUserId = (int) $payload['user_id'];
+        /** @var User $targetUser */
+        $targetUser = User::query()->findOrFail($targetUserId);
+
+        unset($payload['user_id']);
+
+        [$order, $replayed] = $this->orders->create($targetUser, $payload, null, $actor);
+
+        return ApiResponse::success(
+            (new AdminOrderDetailResource($order))->resolve($request),
+            $replayed ? __('orders.order_replayed') : __('orders.order_placed'),
+            $replayed ? 200 : 201,
+        );
+    }
 
     #[OA\Get(
         path: '/api/v1/admin/orders',
@@ -176,8 +202,9 @@ final class AdminOrdersController extends Controller
         $payload = $request->validated();
         $target = OrderStatus::from((string) $payload['status']);
         $note = isset($payload['note']) && is_string($payload['note']) ? $payload['note'] : null;
+        $maintenanceIntervals = $payload['maintenance_intervals'] ?? null;
 
-        $updated = $this->service->transitionStatus($order, $target, $actor, $note, $request->ip());
+        $updated = $this->service->transitionStatus($order, $target, $actor, $note, $request->ip(), $maintenanceIntervals);
 
         return ApiResponse::success(
             (new AdminOrderDetailResource($updated))->resolve($request),

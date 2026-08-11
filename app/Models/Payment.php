@@ -40,6 +40,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property int $id
  * @property string $public_id
  * @property int $order_id
+ * @property int|null $payment_card_id
  * @property int $user_id
  * @property PaymentMethod $payment_method
  * @property string $gateway
@@ -79,6 +80,7 @@ final class Payment extends Model
     protected $fillable = [
         'public_id',
         'order_id',
+        'payment_card_id',
         'user_id',
         'payment_method',
         'gateway',
@@ -150,6 +152,14 @@ final class Payment extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * @return BelongsTo<PaymentCard, $this>
+     */
+    public function paymentCard(): BelongsTo
+    {
+        return $this->belongsTo(PaymentCard::class);
     }
 
     /**

@@ -12,10 +12,12 @@ use App\Enums\PaymentStatus;
 use App\Exceptions\Orders\InvalidOrderStateException;
 use App\Exceptions\Orders\InvalidStatusTransitionException;
 use App\Exceptions\Orders\PaymentNotCapturedException;
+use App\Models\Machine;
 use App\Models\Order;
 use App\Models\OrderInstallation;
 use App\Models\OrderStatusHistory;
 use App\Models\User;
+use App\Services\Maintenance\MaintenanceScheduler;
 use App\Services\Orders\OrderStatusTransitionService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -167,12 +169,13 @@ final class AdminOrderService
         User $actor,
         ?string $note,
         ?string $ip = null,
+        ?array $maintenanceIntervals = null,
     ): Order {
         if ($target === OrderStatus::Scheduled) {
             throw InvalidOrderStateException::useScheduleEndpoint();
         }
 
-        $transitioned = DB::transaction(function () use ($order, $target, $actor, $note): Order {
+        $transitioned = DB::transaction(function () use ($order, $target, $actor, $note, $maintenanceIntervals): Order {
             /** @var Order $locked */
             $locked = Order::query()
                 ->withTrashed()
@@ -200,6 +203,10 @@ final class AdminOrderService
                 actor: $actor,
                 note: $this->normalizeNote($note, 1000),
             );
+
+            if ($target === OrderStatus::Installed && $maintenanceIntervals !== null && $maintenanceIntervals !== []) {
+                $this->applyMaintenanceIntervals($updated, $maintenanceIntervals);
+            }
 
             return $updated;
         });
@@ -429,6 +436,47 @@ final class AdminOrderService
         );
 
         return $entry->fresh(['actor:id,name']) ?? $entry;
+    }
+
+    /**
+     * Apply per-product maintenance intervals to the machines created
+     * from this order when it reaches the installed state.
+     */
+    private function applyMaintenanceIntervals(Order $order, array $intervals): void
+    {
+        $byProduct = [];
+        foreach ($intervals as $entry) {
+            if (! is_array($entry) || ! isset($entry['product_id']) || ! is_numeric($entry['product_id'])) {
+                continue;
+            }
+            $months = isset($entry['filter_change_interval_months']) && is_numeric($entry['filter_change_interval_months'])
+                ? (int) $entry['filter_change_interval_months']
+                : 0;
+            if ($months > 0) {
+                $byProduct[(int) $entry['product_id']] = $months;
+            }
+        }
+
+        $machines = Machine::query()->where('order_id', $order->id)->get();
+        if ($machines->isEmpty()) {
+            return;
+        }
+
+        $scheduler = app(MaintenanceScheduler::class);
+
+        foreach ($machines as $machine) {
+            $months = $byProduct[$machine->product_id] ?? null;
+            if ($months === null) {
+                continue;
+            }
+
+            $machine->filter_change_interval_months = $months;
+            $next = $scheduler->computeNextDue($machine);
+            $machine->update([
+                'filter_change_interval_months' => $months,
+                'next_maintenance_due_at' => $next?->toDateString(),
+            ]);
+        }
     }
 
     /**

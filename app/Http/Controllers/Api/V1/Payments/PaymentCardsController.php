@@ -9,12 +9,17 @@ use App\Http\Requests\Api\V1\Payments\StorePaymentCardRequest;
 use App\Http\Requests\Api\V1\Payments\UpdatePaymentCardRequest;
 use App\Http\Resources\Api\V1\Payments\PaymentCardResource;
 use App\Models\PaymentCard;
+use App\Models\Setting;
 use App\Models\User;
 use App\Support\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
+use Stripe\Customer;
+use Stripe\Exception\ApiErrorException;
+use Stripe\PaymentMethod;
+use Stripe\Stripe;
 
 final class PaymentCardsController extends Controller
 {
@@ -73,20 +78,57 @@ final class PaymentCardsController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $data = $request->validated();
-        $data['user_id'] = $user->id;
+        $validated = $request->validated();
 
-        $card = DB::transaction(function () use ($data): PaymentCard {
-            $isDefault = $data['is_default'] ?? false;
+        $this->configureStripe();
+
+        try {
+            /** @var PaymentMethod $paymentMethod */
+            $paymentMethod = PaymentMethod::retrieve($validated['payment_method_id']);
+
+            if ($user->stripe_customer_id === null) {
+                /** @var Customer $customer */
+                $customer = Customer::create([
+                    'email' => $user->email,
+                    'name' => $user->name,
+                ]);
+
+                $user->forceFill(['stripe_customer_id' => $customer->id])->save();
+            }
+
+            $paymentMethod->attach([
+                'customer' => $user->stripe_customer_id,
+            ]);
+        } catch (ApiErrorException $e) {
+            return ApiResponse::error($e->getMessage(), 422);
+        }
+
+        $card = $paymentMethod->card;
+
+        $data = [
+            'user_id' => $user->id,
+            'stripe_payment_method_id' => $paymentMethod->id,
+            'stripe_customer_id' => $user->stripe_customer_id,
+            'brand' => $card?->brand ?? null,
+            'last_four' => (string) ($card?->last4 ?? '0000'),
+            'expiry_month' => $card !== null && $card->exp_month !== null ? str_pad((string) $card->exp_month, 2, '0', STR_PAD_LEFT) : '00',
+            'expiry_year' => (string) ($card?->exp_year ?? '0000'),
+            'cardholder_name' => $validated['cardholder_name'] ?? ($paymentMethod->billing_details?->name ?? null),
+        ];
+
+        $card = DB::transaction(function () use ($user, $data, $validated): PaymentCard {
+            $isDefault = $validated['is_default'] ?? false;
 
             if ($isDefault) {
                 PaymentCard::query()
-                    ->where('user_id', $data['user_id'])
+                    ->where('user_id', $user->id)
                     ->update(['is_default' => false]);
             }
 
-            if (! $isDefault && PaymentCard::query()->where('user_id', $data['user_id'])->doesntExist()) {
+            if (! $isDefault && PaymentCard::query()->where('user_id', $user->id)->doesntExist()) {
                 $data['is_default'] = true;
+            } else {
+                $data['is_default'] = $isDefault;
             }
 
             return PaymentCard::query()->create($data);
@@ -276,5 +318,15 @@ final class PaymentCardsController extends Controller
             (new PaymentCardResource($paymentCard))->resolve($request),
             __('auth.payment_cards.default_set'),
         );
+    }
+
+    private function configureStripe(): void
+    {
+        $secretKey = (string) Setting::get(
+            'payment.stripe.secret_key',
+            config('payment.stripe.secret_key', '')
+        );
+
+        Stripe::setApiKey($secretKey);
     }
 }

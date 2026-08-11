@@ -62,9 +62,11 @@ interface PaymentGateway
      * Create an embedded-checkout session (SDK token, payment reference,
      * etc.) for the frontend to complete payment without leaving the site.
      *
+     * @param  array<string, mixed>  $context  Optional driver-specific extras.
+     *
      * @throws \RuntimeException When the gateway is unavailable / credentials missing.
      */
-    public function createSession(Payment $payment, Order $order): PaymentSessionResult;
+    public function createSession(Payment $payment, Order $order, array $context = []): PaymentSessionResult;
 
     /**
      * Driver identifier persisted on `payments.gateway`. One of:

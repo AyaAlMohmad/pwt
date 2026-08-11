@@ -112,13 +112,14 @@ final class RolesAndPermissionsSeeder extends Seeder
             //
             // Reserved admin-side keys:
             //   - `orders.view`         — read any customer order (existing)
+            //   - `orders.create`       — admin manual create order (new)
             //   - `orders.update-status` — drive the admin state machine (existing)
             //   - `orders.cancel`       — admin cancellation override (existing)
             //   - `orders.schedule`     — admin schedule install date (existing)
             //   - `orders.cancel-any`   — admin force-cancel beyond customer rules
             //   - `orders.confirm`      — admin manual COD confirm (Phase 17)
             //   - `orders.refund`       — admin manual refund (Phase 2)
-            'orders.view', 'orders.update-status', 'orders.cancel', 'orders.schedule',
+            'orders.view', 'orders.create', 'orders.update-status', 'orders.cancel', 'orders.schedule',
             'orders.cancel-any', 'orders.confirm', 'orders.refund',
 
             // Maintenance

@@ -45,10 +45,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string $discount_amount
  * @property string $tax_amount
  * @property string $tax_rate
- * @property string $shipping_amount
- * @property string $total_amount
- * @property string|null $idempotency_key
- * @property string|null $idempotency_request_hash
+ * @property string|null $installation_preferred_time
  * @property string|null $notes
  * @property string|null $cancellation_reason
  * @property Carbon|null $confirmed_at
@@ -109,10 +106,6 @@ final class Order extends Model
         'idempotency_request_hash',
         'notes',
         'installation_preferred_time',
-        'card_last_four',
-        'card_expiry_month',
-        'card_expiry_year',
-        'card_cvc',
         'cancellation_reason',
         'confirmed_at',
         'scheduled_for_at',
@@ -138,10 +131,6 @@ final class Order extends Model
             'tax_rate' => 'decimal:2',
             'shipping_amount' => 'decimal:2',
             'total_amount' => 'decimal:2',
-            'card_last_four' => 'string',
-            'card_expiry_month' => 'string',
-            'card_expiry_year' => 'string',
-            'card_cvc' => 'string',
             'delivery_date' => 'date',
             'confirmed_at' => 'datetime',
             'scheduled_for_at' => 'datetime',

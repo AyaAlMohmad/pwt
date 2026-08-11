@@ -76,27 +76,6 @@ final class CreateOrderRequest extends FormRequest
             $patches['items'] = $normalised;
         }
 
-        // Derive card_last_four, card_expiry_month, card_expiry_year from UI fields.
-        $cardNumber = $this->input('card_number');
-        if (is_string($cardNumber) && $cardNumber !== '') {
-            $clean = preg_replace('/\D/', '', $cardNumber);
-            if (is_string($clean) && strlen($clean) >= 4) {
-                $patches['card_last_four'] = substr($clean, -4);
-            }
-        }
-
-        $cardExpiry = $this->input('card_expiry');
-        if (is_string($cardExpiry) && $cardExpiry !== '') {
-            $parts = explode('/', $cardExpiry);
-            if (count($parts) === 2) {
-                $month = str_pad(trim($parts[0]), 2, '0', STR_PAD_LEFT);
-                $yearRaw = trim($parts[1]);
-                $year = strlen($yearRaw) === 2 ? '20'.$yearRaw : $yearRaw;
-                $patches['card_expiry_month'] = $month;
-                $patches['card_expiry_year'] = $year;
-            }
-        }
-
         if ($patches !== []) {
             $this->merge($patches);
         }
@@ -147,14 +126,6 @@ final class CreateOrderRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
             'installation_preferred_time' => ['nullable', 'string', 'in:morning,afternoon,evening,anytime'],
 
-            // Card fields: accepted from UI, derived in prepareForValidation, stripped in validated().
-            'card_number' => ['nullable', 'string', 'regex:/^\d{13,19}$/'],
-            'card_expiry' => ['nullable', 'string', 'regex:/^(0[1-9]|1[0-2])\s*\/\s*\d{2,4}$/'],
-            'card_cvc' => ['nullable', 'string', 'regex:/^\d{3,4}$/'],
-            'card_last_four' => ['nullable', 'string', 'size:4', 'regex:/^\d{4}$/'],
-            'card_expiry_month' => ['nullable', 'string', 'size:2', 'regex:/^(0[1-9]|1[0-2])$/'],
-            'card_expiry_year' => ['nullable', 'string', 'size:4', 'regex:/^\d{4}$/'],
-
             // Forbidden — server recomputes these.
             'subtotal_amount' => ['prohibited'],
             'discount_amount' => ['prohibited'],
@@ -167,42 +138,12 @@ final class CreateOrderRequest extends FormRequest
         ];
     }
 
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $v): void {
-            $this->validateCardFields($v);
-        });
-    }
-
-    private function validateCardFields(Validator $v): void
-    {
-        $paymentMethod = $this->input('payment_method');
-        if ($paymentMethod !== 'card') {
-            return;
-        }
-
-        $cardNumber = $this->input('card_number');
-        $cardExpiry = $this->input('card_expiry');
-
-        if ($cardNumber === null || $cardNumber === '') {
-            $v->errors()->add('card_number', __('orders.card_number_required'));
-        }
-        if ($cardExpiry === null || $cardExpiry === '') {
-            $v->errors()->add('card_expiry', __('orders.card_expiry_required'));
-        }
-    }
-
     /**
      * @return array<string, mixed>
      */
     public function validated($key = null, $default = null): array
     {
-        $validated = parent::validated($key, $default);
-
-        // Never persist raw card_number or card_expiry.
-        unset($validated['card_number'], $validated['card_expiry']);
-
-        return $validated;
+        return parent::validated($key, $default);
     }
 
     /**
@@ -226,8 +167,6 @@ final class CreateOrderRequest extends FormRequest
             'customer_name.required' => __('orders.customer_name_required'),
             'customer_email.required' => __('orders.customer_email_required'),
             'customer_phone.required' => __('orders.customer_phone_required'),
-            'card_number.required' => __('orders.card_number_required'),
-            'card_expiry.required' => __('orders.card_expiry_required'),
             'term.in' => __('orders.term_invalid'),
             'payment_method.in' => __('orders.payment_method_invalid'),
             'notes.max' => __('orders.notes_max'),

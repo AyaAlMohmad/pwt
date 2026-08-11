@@ -23,6 +23,7 @@ final readonly class PaymentSessionResult
         public string $paymentReference,
         public ?string $paymentToken,
         public ?string $gatewayTransactionId = null,
+        public ?string $clientPaymentUrl = null,
         public array $raw = [],
     ) {}
 }

@@ -14,9 +14,14 @@ use App\Exceptions\Payments\OrderNotPayableException;
 use App\Exceptions\Payments\PaymentAlreadyInitiatedException;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\PaymentCard;
 use App\Models\PaymentEvent;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\Orders\OrderStatusTransitionService;
+use Stripe\Customer;
+use Stripe\PaymentMethod as StripePaymentMethod;
+use Stripe\Stripe;
 use App\Services\Payments\Dtos\PaymentSessionResult;
 use App\Services\Payments\Dtos\WebhookResult;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -56,6 +61,7 @@ final class PaymentService
         Order $order,
         PaymentMethod $method,
         ?string $idempotencyKey,
+        array $context = [],
     ): array {
         $this->assertOwnedAndPayable($user, $order, $method);
 
@@ -83,7 +89,7 @@ final class PaymentService
             return [$payment, false, null];
         }
 
-        [$payment, $result] = $this->createOnlinePayment($user, $order, $method, $idempotencyKey);
+        [$payment, $result] = $this->createOnlinePayment($user, $order, $method, $idempotencyKey, $context);
 
         return [$payment, false, $result];
     }
@@ -99,6 +105,7 @@ final class PaymentService
         Order $order,
         PaymentMethod $method,
         ?string $idempotencyKey,
+        array $context = [],
     ): array {
         $this->assertOwnedAndPayable($user, $order, $method);
 
@@ -106,7 +113,7 @@ final class PaymentService
         if ($idempotencyKey !== null) {
             $existing = $this->findIdempotent($user, $idempotencyKey);
             if ($existing !== null) {
-                $session = $this->gateway->createSession($existing, $order);
+                $session = $this->gateway->createSession($existing, $order, $context);
 
                 return [$existing, $session];
             }
@@ -114,10 +121,13 @@ final class PaymentService
 
         $this->assertNoActiveInitiated($order);
 
-        $payment = DB::transaction(function () use ($user, $order, $method, $idempotencyKey): Payment {
+        $tokenContext = $this->resolvePaymentMethodContext($user, $method, $context);
+
+        $payment = DB::transaction(function () use ($user, $order, $method, $idempotencyKey, $tokenContext): Payment {
             $payment = Payment::create([
                 'public_id' => (string) Str::uuid(),
                 'order_id' => $order->id,
+                'payment_card_id' => $tokenContext['payment_card_id'],
                 'user_id' => $user->id,
                 'payment_method' => $method->value,
                 'gateway' => $this->gateway->name(),
@@ -152,7 +162,7 @@ final class PaymentService
             return $payment->refresh();
         });
 
-        $session = $this->gateway->createSession($payment, $order);
+        $session = $this->gateway->createSession($payment, $order, $tokenContext['gateway_context']);
 
         // Persist the merchant reference returned by the driver.
         $fields = [
@@ -161,6 +171,10 @@ final class PaymentService
 
         if ($session->gatewayTransactionId !== null) {
             $fields['gateway_transaction_id'] = $session->gatewayTransactionId;
+        }
+
+        if ($session->clientPaymentUrl !== null) {
+            $fields['client_payment_url'] = $session->clientPaymentUrl;
         }
 
         $payment->forceFill($fields)->save();
@@ -371,16 +385,92 @@ final class PaymentService
         });
     }
 
+    private function resolvePaymentMethodContext(
+        User $user,
+        PaymentMethod $method,
+        array $context,
+    ): array {
+        if ($method !== PaymentMethod::Card) {
+            return [
+                'payment_card_id' => null,
+                'payment_method_id' => null,
+                'customer_id' => null,
+                'gateway_context' => [],
+            ];
+        }
+
+        if (isset($context['payment_card_id'])) {
+            /** @var PaymentCard|null $card */
+            $card = PaymentCard::query()
+                ->where('id', (int) $context['payment_card_id'])
+                ->where('user_id', $user->id)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($card === null) {
+                throw new \RuntimeException('Selected payment card not found.');
+            }
+
+            $paymentMethodId = $card->stripe_payment_method_id;
+
+            if ($paymentMethodId === null || $paymentMethodId === '') {
+                throw new \RuntimeException('Saved payment card has no Stripe payment method ID.');
+            }
+
+            if ($user->stripe_customer_id === null || $user->stripe_customer_id === '') {
+                throw new \RuntimeException('User has no Stripe customer ID.');
+            }
+
+            return [
+                'payment_card_id' => $card->id,
+                'payment_method_id' => $paymentMethodId,
+                'customer_id' => $user->stripe_customer_id,
+                'gateway_context' => [
+                    'payment_method_id' => $paymentMethodId,
+                    'customer_id' => $user->stripe_customer_id,
+                ],
+            ];
+        }
+
+        if (isset($context['payment_method_id'])) {
+            $customerId = $this->ensureStripeCustomer($user);
+            $this->configureStripe();
+
+            /** @var StripePaymentMethod $paymentMethod */
+            $paymentMethod = StripePaymentMethod::retrieve((string) $context['payment_method_id']);
+
+            if ($paymentMethod->customer === null || $paymentMethod->customer !== $customerId) {
+                $paymentMethod->attach(['customer' => $customerId]);
+            }
+
+            return [
+                'payment_card_id' => null,
+                'payment_method_id' => (string) $context['payment_method_id'],
+                'customer_id' => $customerId,
+                'gateway_context' => [
+                    'payment_method_id' => (string) $context['payment_method_id'],
+                    'customer_id' => $customerId,
+                ],
+            ];
+        }
+
+        throw new \RuntimeException('Card payment requires payment_card_id or payment_method_id.');
+    }
+
     private function createOnlinePayment(
         User $user,
         Order $order,
         PaymentMethod $method,
         ?string $idempotencyKey,
+        array $context = [],
     ): array {
-        return DB::transaction(function () use ($user, $order, $method, $idempotencyKey): array {
+        $tokenContext = $this->resolvePaymentMethodContext($user, $method, $context);
+
+        return DB::transaction(function () use ($user, $order, $method, $idempotencyKey, $tokenContext): array {
             $payment = Payment::create([
                 'public_id' => (string) Str::uuid(),
                 'order_id' => $order->id,
+                'payment_card_id' => $tokenContext['payment_card_id'],
                 'user_id' => $user->id,
                 'payment_method' => $method->value,
                 'gateway' => $this->gateway->name(),
@@ -392,7 +482,7 @@ final class PaymentService
                 'idempotency_key' => $idempotencyKey,
             ]);
 
-            $result = $this->gateway->initiate($payment, $order);
+            $result = $this->gateway->initiate($payment, $order, $tokenContext['gateway_context']);
 
             $payment->forceFill([
                 'gateway_transaction_id' => $result->gatewayTransactionId,
@@ -524,5 +614,34 @@ final class PaymentService
         }
 
         return $normalised;
+    }
+
+    private function configureStripe(): void
+    {
+        $secretKey = (string) Setting::get(
+            'payment.stripe.secret_key',
+            config('payment.stripe.secret_key', '')
+        );
+
+        Stripe::setApiKey($secretKey);
+    }
+
+    private function ensureStripeCustomer(User $user): string
+    {
+        $this->configureStripe();
+
+        if ($user->stripe_customer_id !== null && $user->stripe_customer_id !== '') {
+            return $user->stripe_customer_id;
+        }
+
+        /** @var Customer $customer */
+        $customer = Customer::create([
+            'email' => $user->email,
+            'name' => $user->name,
+        ]);
+
+        $user->forceFill(['stripe_customer_id' => $customer->id])->save();
+
+        return $customer->id;
     }
 }

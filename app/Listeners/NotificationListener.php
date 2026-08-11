@@ -200,13 +200,21 @@ final class NotificationListener
             }
 
             $title = 'New RFQ Submission — '.$rfq->company_name;
-            $body = sprintf(
-                "Company: %s | Email: %s | Phone: %s | Notes: %s",
-                $rfq->company_name,
-                $rfq->email,
-                (string) ($rfq->phone ?? '—'),
-                (string) ($rfq->notes ?? '—'),
-            );
+            $body = '<h2 style="font-family: sans-serif; margin-bottom: 16px;">New RFQ Submission</h2>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>RFQ ID:</strong> #'.e((string) $rfq->id).'</p>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Company:</strong> '.e($rfq->company_name).'</p>'
+                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Request Details</h3>'
+                . '<table border="1" cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; width: 100%; max-width: 640px;">'
+                . '<thead><tr style="background-color: #f5f5f5;"><th align="left" style="padding: 8px; border: 1px solid #cccccc; width: 30%;">Field</th><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Value</th></tr></thead>'
+                . '<tbody>'
+                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Company Name</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->company_name).'</td></tr>'
+                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Email</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->email).'</td></tr>'
+                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Phone</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e((string) ($rfq->phone ?? '—')).'</td></tr>'
+                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Notes</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.nl2br(e((string) ($rfq->notes ?? '—'))).'</td></tr>'
+                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Submitted At</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->created_at?->format('d M Y, g:i A') ?? '—').'</td></tr>'
+                . '</tbody></table>'
+                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Action Required</h3>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;">Please review and follow up with the customer.</p>';
 
             Log::info('OPS_RFQ_EMAIL_START', [
                 'to' => $targetEmail,
@@ -218,6 +226,7 @@ final class NotificationListener
                 new GenericOpsNotificationMail(
                     title: $title,
                     body: $body,
+                    isHtml: true,
                 ),
             );
 
@@ -321,7 +330,7 @@ final class NotificationListener
     /**
      * Phase 22 — ops-only mail when an order transitions to Completed.
      *
-     * Sends payment + customer + order details to info@pwtmegatech.com.
+     * Sends payment + customer + order + machine details to info@pwtmegatech.com.
      * Failures are logged + swallowed (best-effort).
      */
     private function notifyOpsForOrderCompleted(OrderCompleted $event): void
@@ -331,7 +340,7 @@ final class NotificationListener
         try {
             /** @var Order|null $order */
             $order = Order::query()
-                ->with(['user', 'payments'])
+                ->with(['user', 'payments', 'items.product.category'])
                 ->find($event->orderId);
 
             if ($order === null) {
@@ -342,41 +351,56 @@ final class NotificationListener
                 return;
             }
 
-            $user = $order->user;
-            $payment = $order->payments->first();
+            $payment = $order->latestPayment() ?? $order->payments->first();
 
-            $customerInfo = $user !== null
-                ? sprintf(
-                    "Customer: %s | Email: %s | Phone: %s",
-                    $user->name,
-                    $user->email,
-                    (string) ($user->phone ?? '—'),
-                )
-                : 'Customer: —';
+            $customerName = (string) ($order->customer_name ?? $order->user?->name ?? '—');
+            $customerEmail = (string) ($order->customer_email ?? $order->user?->email ?? '—');
+            $customerPhone = (string) ($order->customer_phone ?? $order->user?->phone ?? '—');
 
-            $paymentInfo = $payment !== null
-                ? sprintf(
-                    "Transaction ID: %s | Merchant Ref: %s | Status: %s | Amount: %s %s | Method: %s | Captured At: %s",
-                    (string) ($payment->gateway_transaction_id ?? '—'),
-                    (string) ($payment->gateway_reference ?? $payment->public_id),
-                    $payment->status->value,
-                    $payment->amount,
-                    $payment->currency,
-                    $payment->payment_method->value,
-                    $payment->captured_at !== null
-                        ? $payment->captured_at->toIso8601String()
-                        : '—',
-                )
-                : 'Payment: —';
+            $amount = $payment !== null
+                ? sprintf('%s %s', $payment->currency, number_format((float) $payment->amount, 2))
+                : '—';
+            $status = $payment !== null ? ucfirst((string) $payment->status->value) : '—';
+            $paymentMethod = $payment !== null
+                ? ucwords(str_replace('_', ' ', (string) $payment->payment_method->value))
+                : '—';
+            $transactionId = $payment !== null ? (string) ($payment->gateway_transaction_id ?? '—') : '—';
+            $capturedAt = $payment?->captured_at?->format('d M Y, g:i A') ?? '—';
 
-            $title = 'Order Completed — #'.$order->public_id;
-            $body = sprintf(
-                "Order ID: %s | Public ID: %s\n%s\n%s",
-                $order->id,
-                $order->public_id,
-                $customerInfo,
-                $paymentInfo,
-            );
+            $orderItems = $order->items->isEmpty()
+                ? '<p>—</p>'
+                : '<table border="1" cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; width: 100%; max-width: 640px;">'
+                    . '<thead><tr style="background-color: #f5f5f5;"><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Category</th><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Product</th><th align="center" style="padding: 8px; border: 1px solid #cccccc;">Qty</th></tr></thead>'
+                    . '<tbody>'
+                    . $order->items->map(function ($item): string {
+                        return sprintf(
+                            '<tr><td style="padding: 8px; border: 1px solid #cccccc;">%s</td><td style="padding: 8px; border: 1px solid #cccccc;">%s</td><td align="center" style="padding: 8px; border: 1px solid #cccccc;">%d</td></tr>',
+                            e((string) ($item->product?->category?->name ?? '—')),
+                            e((string) $item->product_name_snapshot),
+                            $item->quantity,
+                        );
+                    })->implode('')
+                    . '</tbody></table>';
+
+            $title = 'Payment Successfully Captured — '.$order->displayName();
+            $body = '<h2 style="font-family: sans-serif; margin-bottom: 16px;">Payment Successfully Captured</h2>'
+                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Order Details</h3>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Order ID:</strong> #'.e((string) $order->id).'</p>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Public Order ID:</strong> '.e($order->public_id).'</p>'
+                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Order Items</h3>'
+                . $orderItems
+                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Customer Details</h3>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Name:</strong> '.e($customerName).'</p>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Email:</strong> '.e($customerEmail).'</p>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Phone:</strong> '.e($customerPhone).'</p>'
+                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Payment Details</h3>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Amount:</strong> '.e($amount).'</p>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Status:</strong> '.e($status).'</p>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Payment Method:</strong> '.e($paymentMethod).'</p>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Transaction ID:</strong> '.e($transactionId).'</p>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Captured At:</strong> '.e($capturedAt).'</p>'
+                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Action Required</h3>'
+                . '<p style="font-family: sans-serif; margin: 4px 0;">Please proceed with invoice issuance and order processing.</p>';
 
             Log::info('OPS_ORDER_EMAIL_START', [
                 'to' => $targetEmail,
@@ -388,6 +412,7 @@ final class NotificationListener
                 new GenericOpsNotificationMail(
                     title: $title,
                     body: $body,
+                    isHtml: true,
                 ),
             );
 

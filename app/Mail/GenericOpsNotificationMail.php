@@ -30,6 +30,7 @@ final class GenericOpsNotificationMail extends Mailable implements ShouldQueue
     public function __construct(
         public readonly string $title,
         public readonly string $body,
+        public readonly bool $isHtml = false,
     ) {}
 
     public function envelope(): Envelope
@@ -41,7 +42,11 @@ final class GenericOpsNotificationMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        $html = '<p>'.e($this->body).'</p>';
+        if ($this->isHtml) {
+            return new Content(htmlString: $this->body);
+        }
+
+        $html = '<p style="font-family: sans-serif; line-height: 1.5;">'.nl2br(e($this->body)).'</p>';
 
         return new Content(htmlString: $html);
     }

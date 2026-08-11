@@ -48,6 +48,12 @@ final class UpdateOrderStatusRequest extends FormRequest
             'status' => ['required', 'string', 'in:'.implode(',', OrderStatus::values())],
             'note' => ['nullable', 'string', 'min:3', 'max:1000'],
 
+            // Per-product maintenance intervals set when status becomes installed.
+            'maintenance_intervals' => ['required_if:status,installed', 'prohibited_unless:status,installed', 'array', 'min:1'],
+            'maintenance_intervals.*' => ['required', 'array'],
+            'maintenance_intervals.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'maintenance_intervals.*.filter_change_interval_months' => ['required', 'integer', 'min:1', 'max:60'],
+
             // Money fields are server-computed; reject explicit attempts.
             'total_amount' => ['prohibited'],
             'subtotal_amount' => ['prohibited'],

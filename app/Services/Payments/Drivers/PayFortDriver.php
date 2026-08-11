@@ -78,7 +78,7 @@ final class PayFortDriver implements PaymentGateway
         );
     }
 
-    public function createSession(Payment $payment, Order $order): PaymentSessionResult
+    public function createSession(Payment $payment, Order $order, array $context = []): PaymentSessionResult
     {
         $this->assertCredentials();
 

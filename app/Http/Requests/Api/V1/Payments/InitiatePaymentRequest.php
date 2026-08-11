@@ -8,6 +8,7 @@ use App\Enums\PaymentMethod;
 use App\Models\User;
 use App\Rules\OwnedOrder;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 
 /**
@@ -16,6 +17,9 @@ use OpenApi\Attributes as OA;
  * Server-recomputed (never accepted from client):
  *   - amount, currency: copied from the linked order at initiate time.
  *   - gateway, gateway_transaction_id, status: server-managed.
+ *
+ * For card payments the client may supply a saved payment_card_id or a
+ * raw Stripe payment_method_id. Raw PAN/CVV are never accepted.
  *
  * The Idempotency-Key header is parsed by the controller; this Form
  * Request only validates the body.
@@ -72,6 +76,20 @@ final class InitiatePaymentRequest extends FormRequest
                 'string',
                 'in:'.implode(',', PaymentMethod::values()),
             ],
+            'payment_card_id' => [
+                'nullable',
+                'integer',
+                'min:1',
+                Rule::exists('payment_cards', 'id')
+                    ->where('user_id', $userIdInt)
+                    ->whereNull('deleted_at'),
+            ],
+            'payment_method_id' => [
+                'nullable',
+                'string',
+                'regex:/^pm_[A-Za-z0-9]+$/',
+                'max:255',
+            ],
             'mode' => [
                 'nullable',
                 'string',
@@ -101,6 +119,24 @@ final class InitiatePaymentRequest extends FormRequest
             'gateway.prohibited' => __('orders.field_forbidden'),
             'gateway_transaction_id.prohibited' => __('orders.field_forbidden'),
             'status.prohibited' => __('orders.field_forbidden'),
+            'payment_card_id.exists' => __('payments.card_not_found'),
+            'payment_method_id.regex' => __('payments.payment_method_id_invalid'),
         ];
+    }
+
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $v): void {
+            if ((string) $this->input('payment_method') !== 'card') {
+                return;
+            }
+
+            $cardId = $this->input('payment_card_id');
+            $pmId = $this->input('payment_method_id');
+
+            if ($cardId === null && $pmId === null) {
+                $v->errors()->add('payment_card_id', __('payments.payment_card_or_method_required'));
+            }
+        });
     }
 }

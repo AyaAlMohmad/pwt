@@ -62,7 +62,7 @@ final class OrderService
      * @param  array<string, mixed>  $payload  StoreOrderRequest::validated()
      * @return array{0: Order, 1: bool} [order, replayed?]
      */
-    public function create(User $user, array $payload, ?string $idempotencyKey): array
+    public function create(User $user, array $payload, ?string $idempotencyKey, ?User $actor = null): array
     {
         // Idempotency replay — runs OUTSIDE the transaction so reading
         // the existing order does not contend with the create path.
@@ -73,7 +73,10 @@ final class OrderService
             }
         }
 
-        return [DB::transaction(function () use ($user, $payload, $idempotencyKey): Order {
+        $actor = $actor ?? $user;
+
+        return [DB::transaction(function () use ($user, $payload, $idempotencyKey, $actor): Order {
+            $actorType = $actor->id === $user->id ? OrderActorType::Customer : OrderActorType::Admin;
             $deliveryAddressId = isset($payload['delivery_address_id']) && $payload['delivery_address_id'] !== null
                 ? (int) $payload['delivery_address_id']
                 : null;
@@ -181,8 +184,8 @@ final class OrderService
                 'order_id' => $order->id,
                 'from_status' => null,
                 'to_status' => OrderStatus::Pending->value,
-                'actor_type' => OrderActorType::Customer->value,
-                'actor_id' => $user->id,
+                'actor_type' => $actorType->value,
+                'actor_id' => $actor->id,
                 'note' => null,
             ]);
 
@@ -191,11 +194,18 @@ final class OrderService
             // a canonical persisted order.
             $orderId = (int) $order->id;
             $userId = (int) $user->id;
-            DB::afterCommit(static function () use ($orderId, $userId): void {
-                event(new OrderCreated($orderId, $userId, $userId));
+            $actorId = (int) $actor->id;
+            DB::afterCommit(static function () use ($orderId, $userId, $actorId): void {
+                event(new OrderCreated($orderId, $userId, $actorId));
             });
 
-            return $this->eagerLoad($order->refresh());
+            // Admin-created orders are cash-on-delivery-equivalent: do not
+            // wait for an online payment before confirming.
+            if ($actorType === OrderActorType::Admin) {
+                $order = $this->transitions->transition($order, OrderStatus::Confirmed, $actorType, $actor, null);
+            }
+
+            return $this->eagerLoad($order);
         }), false];
     }
 

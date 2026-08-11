@@ -23,6 +23,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int $id
  * @property string $name
  * @property string|null $email
+ * @property string|null $stripe_customer_id
  * @property string $phone_country_code
  * @property string|null $phone
  * @property string $locale
@@ -62,6 +63,7 @@ class User extends Authenticatable
         'avatar_file_id',
         'account_type',
         'company_name',
+        'stripe_customer_id',
     ];
 
     /**

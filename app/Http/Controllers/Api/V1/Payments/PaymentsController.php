@@ -82,7 +82,7 @@ final class PaymentsController extends Controller
             return $this->handlePaymentIntentMode($request, $user, $order, $method, $idempotencyKey);
         }
 
-        [$payment, $replayed, $result] = $this->payments->initiate($user, $order, $method, $idempotencyKey);
+        [$payment, $replayed, $result] = $this->payments->initiate($user, $order, $method, $idempotencyKey, $this->buildContext($request));
         $payment->load('order');
 
         $message = $this->initiateMessage($method, $replayed);
@@ -111,7 +111,7 @@ final class PaymentsController extends Controller
         PaymentMethod $method,
         ?string $idempotencyKey,
     ): JsonResponse {
-        [$payment, $session] = $this->payments->createSession($user, $order, $method, $idempotencyKey);
+        [$payment, $session] = $this->payments->createSession($user, $order, $method, $idempotencyKey, $this->buildContext($request));
         $payment->load('order');
 
         $replayed = ! $payment->wasRecentlyCreated;
@@ -173,7 +173,7 @@ final class PaymentsController extends Controller
         $method = PaymentMethod::from((string) $request->validated('payment_method'));
         $idempotencyKey = $this->resolveIdempotencyKey($request);
 
-        [$payment, $session] = $this->payments->createSession($user, $order, $method, $idempotencyKey);
+        [$payment, $session] = $this->payments->createSession($user, $order, $method, $idempotencyKey, $this->buildContext($request));
         $payment->load('order');
 
         $replayed = ! $payment->wasRecentlyCreated;
@@ -263,6 +263,21 @@ final class PaymentsController extends Controller
             (new PaymentStatusResponseResource($payment))->resolve($request),
             __('payments.status_retrieved'),
         );
+    }
+
+    private function buildContext(InitiatePaymentRequest $request): array
+    {
+        $context = [];
+
+        if ($request->has('payment_card_id')) {
+            $context['payment_card_id'] = (int) $request->validated('payment_card_id');
+        }
+
+        if ($request->has('payment_method_id')) {
+            $context['payment_method_id'] = (string) $request->validated('payment_method_id');
+        }
+
+        return $context;
     }
 
     private function initiateMessage(PaymentMethod $method, bool $replayed): string

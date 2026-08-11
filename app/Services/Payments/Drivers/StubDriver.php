@@ -55,7 +55,7 @@ final class StubDriver implements PaymentGateway
         );
     }
 
-    public function createSession(Payment $payment, Order $order): PaymentSessionResult
+    public function createSession(Payment $payment, Order $order, array $context = []): PaymentSessionResult
     {
         return new PaymentSessionResult(
             sessionId: 'stub_session_'.bin2hex(random_bytes(8)),

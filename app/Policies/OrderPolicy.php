@@ -136,4 +136,13 @@ final class OrderPolicy
 
         return $actor->can('orders.update-status');
     }
+
+    /**
+     * POST /api/v1/admin/orders — admin manual order creation.
+     */
+    public function createAdmin(User $actor): bool
+    {
+        return $actor->can('orders.create');
+    }
+
 }

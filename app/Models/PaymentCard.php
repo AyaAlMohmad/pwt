@@ -17,7 +17,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $user_id
  * @property string|null $brand
  * @property string $last_four
- * @property string|null $card_number_hash
+ * @property string|null $stripe_payment_method_id
+ * @property string|null $stripe_customer_id
  * @property string $expiry_month
  * @property string $expiry_year
  * @property string|null $cardholder_name
@@ -37,8 +38,8 @@ final class PaymentCard extends Model
         'user_id',
         'brand',
         'last_four',
-        'card_number_hash',
-        'cvc',
+        'stripe_payment_method_id',
+        'stripe_customer_id',
         'expiry_month',
         'expiry_year',
         'cardholder_name',

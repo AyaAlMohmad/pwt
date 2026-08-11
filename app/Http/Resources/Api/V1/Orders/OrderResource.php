@@ -59,14 +59,6 @@ class OrderResource extends JsonResource
             'delivery_date' => $order->delivery_date?->toDateString(),
             'delivery_time_slot' => $order->delivery_time_slot,
             'installation_preferred_time' => $order->installation_preferred_time,
-            'payment_card' => $order->card_last_four !== null
-                ? [
-                    'last_four' => $order->card_last_four,
-                    'expiry_month' => $order->card_expiry_month,
-                    'expiry_year' => $order->card_expiry_year,
-                    'cvc' => $order->card_cvc,
-                ]
-                : null,
             'promotion' => $this->resolvePromotionSmall($order),
             'placed_at' => $order->created_at->toIso8601String(),
             'confirmed_at' => $order->confirmed_at?->toIso8601String(),

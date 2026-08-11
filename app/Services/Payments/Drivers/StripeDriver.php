@@ -60,9 +60,9 @@ final class StripeDriver implements PaymentGateway
         $amountCents = $this->toCents($payment->amount, $payment->currency);
         $currency = strtolower($payment->currency);
         $lineItems = $this->buildLineItems($order, $amountCents, $currency);
+        $customerId = (string) ($context['customer_id'] ?? '');
 
-        /** @var Session $session */
-        $session = Session::create([
+        $sessionData = [
             'mode' => 'payment',
             'client_reference_id' => $payment->public_id,
             'customer_email' => $order->customer_email ?? $order->user->email ?? null,
@@ -74,7 +74,14 @@ final class StripeDriver implements PaymentGateway
                 'order_id' => $order->id,
                 'order_public_id' => $order->public_id,
             ],
-        ]);
+        ];
+
+        if ($customerId !== '') {
+            $sessionData['customer'] = $customerId;
+        }
+
+        /** @var Session $session */
+        $session = Session::create($sessionData);
 
         $paymentIntentId = (string) ($session->payment_intent ?? '');
 
@@ -100,15 +107,16 @@ final class StripeDriver implements PaymentGateway
      * Create a Stripe PaymentIntent for embedded checkout.
      * Returns the client_secret as the session token.
      */
-    public function createSession(Payment $payment, Order $order): PaymentSessionResult
+    public function createSession(Payment $payment, Order $order, array $context = []): PaymentSessionResult
     {
         $this->ensureConfigured();
 
         $amountCents = $this->toCents($payment->amount, $payment->currency);
         $currency = strtolower($payment->currency);
+        $paymentMethodId = (string) ($context['payment_method_id'] ?? '');
+        $customerId = (string) ($context['customer_id'] ?? '');
 
-        /** @var PaymentIntent $intent */
-        $intent = PaymentIntent::create([
+        $intentData = [
             'amount' => $amountCents,
             'currency' => $currency,
             'metadata' => [
@@ -116,14 +124,29 @@ final class StripeDriver implements PaymentGateway
                 'order_id' => $order->id,
                 'order_public_id' => $order->public_id,
             ],
-            'automatic_payment_methods' => ['enabled' => true],
-        ]);
+        ];
+
+        if ($paymentMethodId !== '') {
+            $intentData['customer'] = $customerId;
+            $intentData['payment_method'] = $paymentMethodId;
+            $intentData['confirm'] = true;
+            $intentData['return_url'] = (string) $this->setting('return_url', '');
+        } else {
+            $intentData['automatic_payment_methods'] = [
+                'enabled' => true,
+                'allow_redirects' => 'never',
+            ];
+        }
+
+        /** @var PaymentIntent $intent */
+        $intent = PaymentIntent::create($intentData);
 
         return new PaymentSessionResult(
             sessionId: (string) $intent->client_secret,
             paymentReference: (string) $intent->id,
             paymentToken: (string) $intent->client_secret,
             gatewayTransactionId: (string) $intent->id,
+            clientPaymentUrl: null,
             raw: $intent->toArray(),
         );
     }
@@ -288,6 +311,8 @@ final class StripeDriver implements PaymentGateway
             'checkout.session.completed' => ($object['payment_status'] ?? '') === 'paid'
                 ? PaymentStatus::Captured
                 : PaymentStatus::Authorized,
+            'payment_intent.created' => PaymentStatus::Initiated,
+            'payment_intent.requires_action' => PaymentStatus::Initiated,
             'payment_intent.succeeded' => PaymentStatus::Captured,
             'payment_intent.amount_capturable_updated' => PaymentStatus::Authorized,
             'payment_intent.payment_failed' => PaymentStatus::Failed,

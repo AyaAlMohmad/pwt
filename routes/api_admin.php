@@ -103,21 +103,23 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function (): void {
     Route::prefix('orders')->name('orders.')->group(function (): void {
         Route::get('/', [AdminOrdersController::class, 'index'])
             ->name('index');
+        Route::post('/', [AdminOrdersController::class, 'store'])
+            ->name('store');
         Route::get('/{id}', [AdminOrdersController::class, 'show'])
             ->whereNumber('id')
             ->name('show');
         Route::patch('/{id}/status', [AdminOrdersController::class, 'updateStatus'])
             ->whereNumber('id')
             ->name('update-status');
+        Route::post('/{id}/notes', [AdminOrdersController::class, 'addNote'])
+            ->whereNumber('id')
+            ->name('add-note');
         Route::post('/{id}/cancel', [AdminOrdersController::class, 'cancel'])
             ->whereNumber('id')
             ->name('cancel');
         Route::post('/{id}/schedule-installation', [AdminOrdersController::class, 'scheduleInstallation'])
             ->whereNumber('id')
             ->name('schedule-installation');
-        Route::post('/{id}/notes', [AdminOrdersController::class, 'addNote'])
-            ->whereNumber('id')
-            ->name('add-note');
     });
 
     // Phase 18 — Admin Machines. /due-maintenance is declared BEFORE
