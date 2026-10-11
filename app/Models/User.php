@@ -22,6 +22,11 @@ use Spatie\Permission\Traits\HasRoles;
  *
  * @property int $id
  * @property string $name
+ * @property string|null $first_name
+ * @property string|null $last_name
+ * @property AccountType|null $account_type
+ * @property string|null $company_name
+ * @property int|null $avatar_file_id
  * @property string|null $email
  * @property string|null $stripe_customer_id
  * @property string $phone_country_code
@@ -29,6 +34,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $locale
  * @property bool $is_active
  * @property string $password
+ * @property string|null $contact_name
+ * @property string|null $contact_email
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $last_login_at
  * @property Carbon|null $deleted_at
@@ -63,6 +70,8 @@ class User extends Authenticatable
         'avatar_file_id',
         'account_type',
         'company_name',
+        'contact_name',
+        'contact_email',
         'stripe_customer_id',
     ];
 

@@ -34,7 +34,7 @@ return [
      * Single shared ops inbox used by the maintenance-created-for-ops
      * notification. Phase 22 may add per-region routing.
      */
-    'ops_inbox_email' => env('OPS_INBOX_EMAIL', 'ops@pwt.example'),
+    'ops_inbox_email' => env('OPS_INBOX_EMAIL', 'info@pwtmegatech.com'),
 
     /*
      * Channel-driver bindings. Keyed by the enum value to match

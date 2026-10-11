@@ -73,6 +73,10 @@ final class StripeDriver implements PaymentGateway
                 'payment_public_id' => $payment->public_id,
                 'order_id' => $order->id,
                 'order_public_id' => $order->public_id,
+                'tax_rate' => $order->tax_rate !== null ? (string) $order->tax_rate : '',
+                'subtotal_amount' => $order->subtotal_amount !== null ? (string) $order->subtotal_amount : '',
+                'total_amount' => $order->total_amount !== null ? (string) $order->total_amount : '',
+                'shipping_amount' => $order->shipping_amount !== null ? (string) $order->shipping_amount : '',
             ],
         ];
 
@@ -123,6 +127,10 @@ final class StripeDriver implements PaymentGateway
                 'payment_public_id' => $payment->public_id,
                 'order_id' => $order->id,
                 'order_public_id' => $order->public_id,
+                'tax_rate' => $order->tax_rate !== null ? (string) $order->tax_rate : '',
+                'subtotal_amount' => $order->subtotal_amount !== null ? (string) $order->subtotal_amount : '',
+                'total_amount' => $order->total_amount !== null ? (string) $order->total_amount : '',
+                'shipping_amount' => $order->shipping_amount !== null ? (string) $order->shipping_amount : '',
             ],
         ];
 

@@ -87,7 +87,7 @@ final class PasswordResetService
 
             if ($channel === ResetChannel::Email) {
                 // Email channel: send OTP code instead of a link token.
-                $otp = $this->otpService->createOtp($identifier, OtpPurpose::Reset, $ip);
+                $otp = $this->otpService->createOtp($identifier, OtpPurpose::Reset, $ip, false);
 
                 /** @var PasswordReset $reset */
                 $reset = PasswordReset::query()->create([
@@ -314,5 +314,4 @@ final class PasswordResetService
 
         return [$cc, $local];
     }
-
 }

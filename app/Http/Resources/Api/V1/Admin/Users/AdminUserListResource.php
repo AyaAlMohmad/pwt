@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Admin\Users;
 
+use App\Http\Resources\Api\V1\Addresses\AddressResource;
+use App\Models\Address;
 use App\Models\User;
 use App\Services\Auth\AdminAuthService;
 use Illuminate\Http\Request;
@@ -38,15 +40,23 @@ class AdminUserListResource extends JsonResource
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'company_name' => $user->company_name,
             'email' => $user->email,
+            'contact_name' => $user->contact_name,
+            'contact_email' => $user->contact_email,
             'phone' => $user->phone,
             'phone_country_code' => $user->phone_country_code,
             'phone_e164' => $phoneE164,
             'locale' => $user->locale,
             'is_active' => (bool) $user->is_active,
-            'type' => $user->account_type?->value ?? null,
+            'type' => $user->account_type?->value,
             'emirate' => $this->resolveEmirate($user),
+            'default_address' => $this->resolveDefaultAddress($user, $request),
             'role' => $this->resolveRole($user),
+            'avatar_file_id' => $user->avatar_file_id,
+            'email_verified_at' => $user->email_verified_at?->toIso8601String(),
             'last_login_at' => $user->last_login_at?->toIso8601String(),
             'created_at' => $user->created_at?->toIso8601String(),
             'deleted_at' => $user->deleted_at?->toIso8601String(),
@@ -76,19 +86,28 @@ class AdminUserListResource extends JsonResource
     }
 
     /**
+     * The customer's default address — full {@see AddressResource} shape
+     * so the admin UI gets line1/city/region/country/lat/lng without a
+     * second round-trip. Null when the relation isn't eager-loaded or the
+     * user has no address at all.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function resolveDefaultAddress(User $user, Request $request): ?array
+    {
+        $default = $this->resolveDefaultAddressModel($user);
+
+        return $default !== null
+            ? (new AddressResource($default))->resolve($request)
+            : null;
+    }
+
+    /**
      * Resolve the user's emirate from their default address region.
      */
     private function resolveEmirate(User $user): ?string
     {
-        if (! $user->relationLoaded('addresses')) {
-            return null;
-        }
-
-        $default = $user->addresses->first(static fn ($a) => (bool) $a->is_default);
-        if ($default === null) {
-            $default = $user->addresses->first();
-        }
-
+        $default = $this->resolveDefaultAddressModel($user);
         if ($default === null) {
             return null;
         }
@@ -100,5 +119,20 @@ class AdminUserListResource extends JsonResource
         }
 
         return $default->city ?: null;
+    }
+
+    /**
+     * Pick the address flagged `is_default`, falling back to the first
+     * loaded row (the list query loads a single address ordered by
+     * `is_default DESC`, so the fallback is the same row).
+     */
+    private function resolveDefaultAddressModel(User $user): ?Address
+    {
+        if (! $user->relationLoaded('addresses')) {
+            return null;
+        }
+
+        return $user->addresses->first(static fn (Address $a): bool => (bool) $a->is_default)
+            ?? $user->addresses->first();
     }
 }

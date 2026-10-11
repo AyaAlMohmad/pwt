@@ -13,7 +13,10 @@ namespace App\Enums;
  */
 enum PaymentMethod: string
 {
+    case BankTransfer = 'bank_transfer';
     case Card = 'card';
+    case Cash = 'cash';
+    case Invoice = 'invoice';
     case ApplePay = 'apple_pay';
     case GooglePay = 'google_pay';
     case Cod = 'cod';
@@ -32,6 +35,6 @@ enum PaymentMethod: string
      */
     public function isOnline(): bool
     {
-        return $this !== self::Cod;
+        return in_array($this, [self::Card, self::ApplePay, self::GooglePay], true);
     }
 }

@@ -30,7 +30,7 @@ final class AdminUserDetailResource extends AdminUserListResource
         $data = parent::toArray($request);
 
         if ($user->relationLoaded('addresses')) {
-            $data['addresses'] = AddressResource::collection($user->addresses);
+            $data['addresses'] = AddressResource::collection($user->addresses)->resolve($request);
         } else {
             $data['addresses'] = [];
         }

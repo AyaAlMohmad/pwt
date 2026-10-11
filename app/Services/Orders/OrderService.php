@@ -147,6 +147,8 @@ final class OrderService
                 'customer_phone' => $payload['customer_phone'] ?? null,
                 'delivery_address_id' => $deliveryAddress?->id,
                 'delivery_address_line_1' => $payload['delivery_address_line_1'] ?? null,
+                'delivery_city' => $payload['delivery_city'] ?? $deliveryAddress?->city,
+                'delivery_country' => $payload['delivery_country'] ?? $deliveryAddress?->country?->name,
                 'delivery_date' => $payload['delivery_date'] ?? null,
                 'delivery_time_slot' => $payload['delivery_time_slot'] ?? null,
                 'billing_address_id' => $billingAddress?->id,
@@ -474,12 +476,6 @@ final class OrderService
 
                 continue;
             }
-            if ($product->is_quote_only) {
-                $errors["items.$idx"] = [__('orders.product_quote_only')];
-
-                continue;
-            }
-
             /** @var ProductPrice|null $price */
             $price = ProductPrice::query()
                 ->where('product_id', $productId)
@@ -489,13 +485,15 @@ final class OrderService
                 ->orderBy('currency', 'asc')
                 ->first();
 
-            if ($price === null) {
+            $customUnitPrice = is_numeric($line['unit_price'] ?? null) ? (float) $line['unit_price'] : null;
+
+            if ($price === null && $customUnitPrice === null && ! $product->is_quote_only) {
                 $errors["items.$idx"] = [__('orders.price_not_available', ['currency' => $currency])];
 
                 continue;
             }
 
-            $unit = (float) $price->amount;
+            $unit = $price !== null ? (float) $price->amount : ($customUnitPrice ?? 0.0);
             $sub = round($unit * $quantity, 2);
             $translations = $product->getTranslations('name');
             $name = $translations !== []
@@ -509,10 +507,10 @@ final class OrderService
                 'term' => $term,
                 'unit_price' => $unit,
                 'quantity' => $quantity,
-                'currency' => $price->currency,
+                'currency' => $price !== null ? (string) $price->currency : $currency,
                 'line_subtotal' => $sub,
-                'rent_period' => $price->period,
-                'rent_min_term_months' => $price->min_term_months,
+                'rent_period' => $price?->period,
+                'rent_min_term_months' => $price?->min_term_months,
                 'category_id' => $product->category_id,
             ];
         }

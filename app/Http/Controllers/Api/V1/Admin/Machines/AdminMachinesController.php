@@ -212,7 +212,7 @@ final class AdminMachinesController extends Controller
     #[OA\Put(
         path: '/api/v1/admin/machines/{id}',
         operationId: 'adminMachinesUpdate',
-        description: 'Update a machine. `user_id` and `product_id` are immutable. Recomputes next_maintenance_due_at when filter_change_interval_months changes AND no explicit override is supplied.',
+        description: 'Update a machine. `user_id` (ownership) and `product_id` can be reassigned; changing `user_id` requires an `address_id` owned by the new customer in the same request. Recomputes next_maintenance_due_at when filter_change_interval_months changes AND no explicit override is supplied.',
         summary: 'Update machine (admin)',
         security: [['sanctum' => []]],
         requestBody: new OA\RequestBody(required: true,

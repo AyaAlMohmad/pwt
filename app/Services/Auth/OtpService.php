@@ -46,12 +46,11 @@ final class OtpService
      *
      * @throws OtpRateLimitException when the per-hour cap is exceeded.
      */
-    public function createOtp(string $identifier, OtpPurpose $purpose, ?string $ip = null): Otp
+    public function createOtp(string $identifier, OtpPurpose $purpose, ?string $ip = null, bool $useTestCode = true): Otp
     {
-        return DB::transaction(function () use ($identifier, $purpose, $ip): Otp {
-            $recentCount = Otp::query()
-                ->where('identifier', $identifier)
-                ->where('purpose', $purpose->value)
+        return DB::transaction(function () use ($identifier, $purpose, $ip, $useTestCode): Otp {
+            $recentCount = Otp::forIdentifier($identifier, $purpose)
+                ->active()
                 ->where('created_at', '>=', now()->subHour())
                 ->count();
 
@@ -65,7 +64,7 @@ final class OtpService
                 ->whereNull('consumed_at')
                 ->update(['consumed_at' => now()]);
 
-            $code = config('sms.test_mode', false)
+            $code = ($useTestCode && config('sms.test_mode', false))
                 ? (string) config('sms.test_code', '123456')
                 : (string) random_int(100000, 999999);
 
@@ -110,7 +109,7 @@ final class OtpService
             'to' => $identifier,
             'driver_class' => $driverClass,
             'driver_key' => $driverKey,
-            'sms_config' => $this->maskSmsConfig(config('sms.driver_config.' . $driverKey, [])),
+            'sms_config' => $this->maskSmsConfig(config('sms.driver_config.'.$driverKey, [])),
             'purpose' => $purpose->value,
             'otp_id' => $otp->public_id,
             'otp_code' => $otp->plainCode,
@@ -230,7 +229,7 @@ final class OtpService
     /**
      * Mask sensitive keys in SMS driver config for safe logging.
      *
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function maskSmsConfig(array $config): array
@@ -249,7 +248,7 @@ final class OtpService
                     }
                 }
                 $masked[$k] = $isSensitive && strlen($v) > 4
-                    ? str_repeat('*', strlen($v) - 4) . substr($v, -4)
+                    ? str_repeat('*', strlen($v) - 4).substr($v, -4)
                     : $v;
             } else {
                 $masked[$k] = $v;

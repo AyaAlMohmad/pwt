@@ -56,6 +56,9 @@ class OrderResource extends JsonResource
             'customer' => $this->resolveCustomer($order),
             'delivery_address' => $this->resolveDeliveryAddressSmall($order),
             'delivery_address_line_1' => $order->delivery_address_line_1,
+            'delivery_city' => $order->delivery_city,
+            'delivery_country' => $order->delivery_country,
+            'country_code' => $this->resolveCountryCode($order),
             'delivery_date' => $order->delivery_date?->toDateString(),
             'delivery_time_slot' => $order->delivery_time_slot,
             'installation_preferred_time' => $order->installation_preferred_time,
@@ -180,5 +183,27 @@ class OrderResource extends JsonResource
             'code' => $promo->code,
             'name' => $promo->getTranslation('name', $locale),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveCountryCode(Order $order): ?string
+    {
+        if ($order->relationLoaded('deliveryAddress') && $order->deliveryAddress !== null) {
+            $country = $order->deliveryAddress->relationLoaded('country')
+                ? $order->deliveryAddress->country
+                : null;
+
+            if ($country?->code !== null) {
+                return $country->code;
+            }
+        }
+
+        if (is_string($order->delivery_country) && strlen($order->delivery_country) <= 3) {
+            return strtoupper($order->delivery_country);
+        }
+
+        return null;
     }
 }

@@ -11,7 +11,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 
 /**
  * Validates that a product id refers to an active, in-stock,
- * non-soft-deleted, non-quote-only product.
+ * non-soft-deleted product.
  *
  * Used per-line on `POST /api/v1/orders`. A soft / structured failure
  * (out of stock, coming soon, quote-only) is re-mapped to
@@ -50,8 +50,5 @@ final class ActiveProduct implements ValidationRule
             return;
         }
 
-        if ($product->is_quote_only) {
-            $fail(__('orders.product_quote_only'));
-        }
     }
 }

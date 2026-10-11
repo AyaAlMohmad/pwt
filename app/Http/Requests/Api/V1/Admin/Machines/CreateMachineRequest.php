@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Admin\Machines;
 
+use App\Enums\MachineVoltage;
 use App\Enums\ProductTerm;
 use App\Rules\ActiveProduct;
-use App\Rules\AddressBelongsToUser;
 use App\Rules\IsCustomer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -28,6 +28,14 @@ final class CreateMachineRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $voltage = $this->input('voltage');
+        if (is_string($voltage) && $voltage !== '') {
+            $this->merge(['voltage' => MachineVoltage::normalise($voltage) ?? $voltage]);
+        }
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */
@@ -41,10 +49,10 @@ final class CreateMachineRequest extends FormRequest
             'serial_number' => ['required', 'string', 'max:80', 'unique:machines,serial_number'],
             'term' => ['required', 'string', 'in:'.implode(',', ProductTerm::values())],
             'installed_at' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
-            'filter_change_interval_months' => ['nullable', 'integer', 'in:3,6,12'],
+            'filter_change_interval_months' => ['nullable', 'integer', 'min:1', 'max:12'],
             'next_maintenance_due_at' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:installed_at'],
             'country_code' => ['required', 'string', 'size:2', 'exists:countries,code'],
-            'voltage' => ['nullable', 'string', 'in:220V,110V,Dual'],
+            'voltage' => ['nullable', 'string', 'in:'.implode(',', MachineVoltage::values())],
 
             // Fields removed from create API — explicitly reject them.
             'address_id' => ['prohibited'],

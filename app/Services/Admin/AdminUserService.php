@@ -8,14 +8,19 @@ use App\Enums\UserRole;
 use App\Exceptions\Admin\Users\CannotChangeOwnRoleException;
 use App\Exceptions\Admin\Users\CannotDeactivateSelfException;
 use App\Exceptions\Admin\Users\LastSuperAdminException;
+use App\Http\Requests\Api\V1\Admin\Users\UpdateAdminUserRequest;
+use App\Models\Address;
 use App\Models\User;
 use App\Services\Addresses\AddressService;
+use App\Support\Names\PersonNameNormaliser;
 use App\Services\Auth\AdminAuthService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Admin-side users lifecycle service.
@@ -81,7 +86,7 @@ final class AdminUserService
 
         $query->with('roles')
             ->with(['addresses' => function ($q): void {
-                $q->with('region:id,name')->orderByDesc('is_default')->limit(1);
+                $q->with(['region:id,name', 'country'])->orderByDesc('is_default')->limit(1);
             }])
             ->withCount(['orders', 'supportTickets', 'machines']);
 
@@ -133,7 +138,7 @@ final class AdminUserService
 
         /** @var User $user */
         $user = $query
-            ->with('roles')
+            ->with(['roles', 'addresses.country', 'addresses.region'])
             ->findOrFail($id);
 
         $user->loadCount(['orders', 'supportTickets', 'machines']);
@@ -157,22 +162,24 @@ final class AdminUserService
 
         $isAdminRole = $requestedRole !== UserRole::Customer->value;
         if ($isAdminRole && ! $actor->hasRole(UserRole::SuperAdmin->value)) {
-            throw new \Illuminate\Auth\Access\AuthorizationException(
+            throw new AuthorizationException(
                 __('admin.users.role_change_forbidden'),
             );
         }
 
-        $user = DB::transaction(function () use ($payload, $requestedRole): User {
+        $nameData = PersonNameNormaliser::reconcile($payload, null, null, null);
+
+        $user = DB::transaction(function () use ($payload, $requestedRole, $nameData): User {
             /** @var User $user */
             $user = User::query()->create([
-                'name' => (string) $payload['name'],
+                ...$nameData,
                 'email' => isset($payload['email']) && is_string($payload['email']) ? $payload['email'] : null,
                 'phone_country_code' => (string) $payload['phone_country_code'],
                 'phone' => (string) $payload['phone'],
                 'locale' => isset($payload['locale']) && is_string($payload['locale']) ? $payload['locale'] : config('app.locale', 'en'),
                 'account_type' => (string) $payload['account_type'],
                 'company_name' => isset($payload['company_name']) && is_string($payload['company_name']) ? $payload['company_name'] : null,
-                'password' => \Illuminate\Support\Facades\Hash::make((string) $payload['password']),
+                'password' => Hash::make((string) $payload['password']),
                 'is_active' => true,
             ]);
 
@@ -259,7 +266,18 @@ final class AdminUserService
             // also covers the `is_active=false` on a sole super_admin.
             $this->guardLastSuperAdmin($locked, $payload);
 
+            $payload = array_merge(
+                $payload,
+                PersonNameNormaliser::reconcile(
+                    $payload,
+                    $locked->name,
+                    $locked->first_name,
+                    $locked->last_name,
+                ),
+            );
+
             $changes = $this->applyMutableFields($locked, $payload);
+            $addressChange = $this->syncAddress($locked, $payload);
 
             $roleChanged = false;
             $afterRole = $beforeRole;
@@ -282,17 +300,18 @@ final class AdminUserService
 
             $after = $this->snapshotFields($locked);
 
-            if ($changes !== [] || $roleChanged) {
+            if ($changes !== [] || $roleChanged || $addressChange !== null) {
                 $this->logActivity(
                     event: 'admin.user.updated',
                     description: 'Admin updated user',
                     target: $locked,
                     actor: $actor,
-                    properties: [
+                    properties: array_filter([
                         'ip' => $ip,
                         'before' => $before,
                         'after' => $after,
-                    ],
+                        'address' => $addressChange,
+                    ], static fn (mixed $value): bool => $value !== null),
                 );
             }
 
@@ -325,7 +344,7 @@ final class AdminUserService
             }
 
             $locked->refresh();
-            $locked->load('roles');
+            $locked->load(['roles', 'addresses.country', 'addresses.region']);
             $locked->loadCount(['orders', 'supportTickets', 'machines']);
 
             return $locked;
@@ -361,6 +380,7 @@ final class AdminUserService
                     'no_op' => true,
                 ],
             );
+            $target->load(['addresses.country', 'addresses.region']);
             $target->loadCount(['orders', 'supportTickets', 'machines']);
 
             return $target;
@@ -400,7 +420,7 @@ final class AdminUserService
             );
 
             $locked->refresh();
-            $locked->load('roles');
+            $locked->load(['roles', 'addresses.country', 'addresses.region']);
             $locked->loadCount(['orders', 'supportTickets', 'machines']);
 
             return $locked;
@@ -501,6 +521,50 @@ final class AdminUserService
     }
 
     /**
+     * Apply the optional `address` block of a PATCH payload.
+     *
+     * Resolution order:
+     *  1. `address.id` → that exact row (ownership already asserted by
+     *     {@see UpdateAdminUserRequest}).
+     *  2. no id → the target's default address (`is_default DESC`).
+     *  3. no address at all → insert a new one (the request requires
+     *     `label` + `line1` in that case, both NOT NULL columns).
+     *
+     * Both branches delegate to {@see AddressService} so the
+     * "at most one default per user" invariant and the 10-per-customer
+     * cap keep being enforced in one place.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{action: string, id: int, changed: list<string>}|null
+     *                                                                    Audit fragment, or null when the payload carries no address.
+     */
+    private function syncAddress(User $user, array $payload): ?array
+    {
+        if (! isset($payload['address']) || ! is_array($payload['address'])) {
+            return null;
+        }
+
+        /** @var array<string, mixed> $data */
+        $data = $payload['address'];
+        $targetId = isset($data['id']) && is_numeric($data['id']) ? (int) $data['id'] : null;
+        unset($data['id']);
+
+        $address = $targetId !== null
+            ? Address::query()->where('user_id', $user->id)->whereKey($targetId)->first()
+            : Address::query()->where('user_id', $user->id)->orderByDesc('is_default')->first();
+
+        if ($address === null) {
+            $created = $this->addressService->create($user, $data);
+
+            return ['action' => 'created', 'id' => $created->id, 'changed' => array_keys($data)];
+        }
+
+        $this->addressService->update($address, $data);
+
+        return ['action' => 'updated', 'id' => $address->id, 'changed' => array_keys($data)];
+    }
+
+    /**
      * Apply the mass-fillable mutable fields. Returns the list of column
      * names actually changed.
      *
@@ -510,17 +574,22 @@ final class AdminUserService
     private function applyMutableFields(User $user, array $payload): array
     {
         $fillable = [];
-        foreach (['name', 'email', 'phone', 'phone_country_code', 'locale', 'company_name'] as $field) {
+        foreach (['name', 'first_name', 'last_name', 'account_type', 'email', 'phone', 'phone_country_code', 'locale', 'company_name', 'contact_name', 'contact_email', 'avatar_file_id'] as $field) {
             if (array_key_exists($field, $payload)) {
                 $fillable[$field] = $payload[$field];
             }
         }
+        // Not mass-assignable on the model — set directly.
+        if (array_key_exists('email_verified_at', $payload)) {
+            $user->email_verified_at = $payload['email_verified_at'] !== null
+                ? Carbon::parse((string) $payload['email_verified_at'])
+                : null;
+        }
         if (array_key_exists('is_active', $payload)) {
             $fillable['is_active'] = (bool) $payload['is_active'];
         }
-
-        if ($fillable === []) {
-            return [];
+        if (array_key_exists('password', $payload) && is_string($payload['password']) && $payload['password'] !== '') {
+            $fillable['password'] = Hash::make($payload['password']);
         }
 
         $user->fill($fillable);
@@ -626,11 +695,19 @@ final class AdminUserService
     {
         return [
             'name' => $user->name,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'account_type' => $user->account_type?->value,
             'email' => $user->email,
             'phone' => $user->phone,
             'phone_country_code' => $user->phone_country_code,
             'locale' => $user->locale,
+            'company_name' => $user->company_name,
+            'contact_name' => $user->contact_name,
+            'contact_email' => $user->contact_email,
             'is_active' => (bool) $user->is_active,
+            'avatar_file_id' => $user->avatar_file_id,
+            'email_verified_at' => $user->email_verified_at?->toIso8601String(),
         ];
     }
 

@@ -11,6 +11,7 @@ use App\Events\Auth\PasswordResetPhone;
 use App\Events\BaseDomainEvent;
 use App\Events\Contact\ContactLeadCreated;
 use App\Events\Orders\OrderCompleted;
+use App\Events\Payments\PaymentCaptured;
 use App\Events\Rfq\RfqCreated;
 use App\Events\Support\SupportTicketAssigned;
 use App\Events\Support\SupportTicketCancelled;
@@ -21,6 +22,7 @@ use App\Mail\GenericOpsNotificationMail;
 use App\Models\ContactLead;
 use App\Models\NotificationTemplate;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\RfqRequest;
 use App\Models\User;
 use App\Services\Notifications\NotificationDispatcher;
@@ -85,12 +87,16 @@ final class NotificationListener
             return;
         }
 
-        // Phase 22 — Order completed: ops-only email with payment +
-        // customer + order details. No customer-facing notification.
+        // Order completed no longer sends a separate ops email; the
+        // detailed payment email is triggered by PaymentCaptured so ops
+        // gets the same content at the right time without duplication.
         if ($event instanceof OrderCompleted) {
-            $this->notifyOpsForOrderCompleted($event);
-
             return;
+        }
+
+        // Payment successfully captured: ops-only email to info@pwtmegatech.com.
+        if ($event instanceof PaymentCaptured) {
+            $this->notifyOpsForPaymentCaptured($event);
         }
 
         // Standard customer-side fan-out via the dispatcher.
@@ -201,20 +207,20 @@ final class NotificationListener
 
             $title = 'New RFQ Submission — '.$rfq->company_name;
             $body = '<h2 style="font-family: sans-serif; margin-bottom: 16px;">New RFQ Submission</h2>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>RFQ ID:</strong> #'.e((string) $rfq->id).'</p>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Company:</strong> '.e($rfq->company_name).'</p>'
-                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Request Details</h3>'
-                . '<table border="1" cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; width: 100%; max-width: 640px;">'
-                . '<thead><tr style="background-color: #f5f5f5;"><th align="left" style="padding: 8px; border: 1px solid #cccccc; width: 30%;">Field</th><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Value</th></tr></thead>'
-                . '<tbody>'
-                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Company Name</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->company_name).'</td></tr>'
-                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Email</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->email).'</td></tr>'
-                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Phone</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e((string) ($rfq->phone ?? '—')).'</td></tr>'
-                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Notes</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.nl2br(e((string) ($rfq->notes ?? '—'))).'</td></tr>'
-                . '<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Submitted At</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->created_at?->format('d M Y, g:i A') ?? '—').'</td></tr>'
-                . '</tbody></table>'
-                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Action Required</h3>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;">Please review and follow up with the customer.</p>';
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>RFQ ID:</strong> #'.e((string) $rfq->id).'</p>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Company:</strong> '.e($rfq->company_name).'</p>'
+                .'<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Request Details</h3>'
+                .'<table border="1" cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; width: 100%; max-width: 640px;">'
+                .'<thead><tr style="background-color: #f5f5f5;"><th align="left" style="padding: 8px; border: 1px solid #cccccc; width: 30%;">Field</th><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Value</th></tr></thead>'
+                .'<tbody>'
+                .'<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Company Name</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->company_name).'</td></tr>'
+                .'<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Email</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->email).'</td></tr>'
+                .'<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Phone</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e((string) ($rfq->phone ?? '—')).'</td></tr>'
+                .'<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Notes</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.nl2br(e((string) ($rfq->notes ?? '—'))).'</td></tr>'
+                .'<tr><td style="padding: 8px; border: 1px solid #cccccc;"><strong>Submitted At</strong></td><td style="padding: 8px; border: 1px solid #cccccc;">'.e($rfq->created_at?->format('d M Y, g:i A') ?? '—').'</td></tr>'
+                .'</tbody></table>'
+                .'<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Action Required</h3>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;">Please review and follow up with the customer.</p>';
 
             Log::info('OPS_RFQ_EMAIL_START', [
                 'to' => $targetEmail,
@@ -272,8 +278,6 @@ final class NotificationListener
                     'type' => 'contact.created_ops',
                     'channel' => 'email',
                 ]);
-
-                return;
             }
 
             /** @var ContactLead|null $lead */
@@ -282,6 +286,14 @@ final class NotificationListener
                 Log::warning('notifications.ops.contact_lead_missing', [
                     'contact_lead_id' => $event->contactLeadId,
                 ]);
+
+                return;
+            }
+
+            // A missing / deactivated template must never swallow a real
+            // lead — fall back to a plain rendering of the submission.
+            if ($template === null) {
+                $this->mailContactLeadFallback($opsEmail, $lead);
 
                 return;
             }
@@ -328,12 +340,41 @@ final class NotificationListener
     }
 
     /**
-     * Phase 22 — ops-only mail when an order transitions to Completed.
+     * Template-less rendering of a contact lead for the ops inbox.
      *
-     * Sends payment + customer + order + machine details to info@pwtmegatech.com.
-     * Failures are logged + swallowed (best-effort).
+     * Used when the `contact.created_ops` email template row is missing
+     * or deactivated so the submission still reaches ops.
      */
-    private function notifyOpsForOrderCompleted(OrderCompleted $event): void
+    private function mailContactLeadFallback(string $opsEmail, ContactLead $lead): void
+    {
+        $body = 'New contact-form submission (#'.$lead->id.')'."\n\n"
+            .'Name: '.$lead->name."\n"
+            .'Email: '.$lead->email."\n"
+            .'Phone: '.($lead->phone ?? '—')."\n"
+            .'Source: '.$lead->source->value."\n"
+            .'Subject: '.$lead->subject."\n\n"
+            .$lead->message;
+
+        Mail::to($opsEmail)->queue(
+            new GenericOpsNotificationMail(
+                title: 'New Contact Submission — '.$lead->subject,
+                body: $body,
+            ),
+        );
+
+        Log::info('OPS_CONTACT_EMAIL_QUEUED_FALLBACK', [
+            'to' => $opsEmail,
+            'contact_lead_id' => $lead->id,
+        ]);
+    }
+
+    /**
+     * Ops-only mail when a payment is successfully captured.
+     *
+     * Sends the full order + payment details to info@pwtmegatech.com on
+     * every successful payment. Failures are logged + swallowed (best-effort).
+     */
+    private function notifyOpsForPaymentCaptured(PaymentCaptured $event): void
     {
         $targetEmail = 'info@pwtmegatech.com';
 
@@ -344,14 +385,17 @@ final class NotificationListener
                 ->find($event->orderId);
 
             if ($order === null) {
-                Log::warning('notifications.ops.order_missing', [
+                Log::warning('notifications.ops.order_missing_for_payment', [
                     'order_id' => $event->orderId,
+                    'payment_id' => $event->paymentId,
                 ]);
 
                 return;
             }
 
-            $payment = $order->latestPayment() ?? $order->payments->first();
+            /** @var Payment|null $payment */
+            $payment = Payment::query()->find($event->paymentId)
+                ?? ($order->latestPayment() ?? $order->payments->first());
 
             $customerName = (string) ($order->customer_name ?? $order->user?->name ?? '—');
             $customerEmail = (string) ($order->customer_email ?? $order->user?->email ?? '—');
@@ -370,9 +414,9 @@ final class NotificationListener
             $orderItems = $order->items->isEmpty()
                 ? '<p>—</p>'
                 : '<table border="1" cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; width: 100%; max-width: 640px;">'
-                    . '<thead><tr style="background-color: #f5f5f5;"><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Category</th><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Product</th><th align="center" style="padding: 8px; border: 1px solid #cccccc;">Qty</th></tr></thead>'
-                    . '<tbody>'
-                    . $order->items->map(function ($item): string {
+                    .'<thead><tr style="background-color: #f5f5f5;"><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Category</th><th align="left" style="padding: 8px; border: 1px solid #cccccc;">Product</th><th align="center" style="padding: 8px; border: 1px solid #cccccc;">Qty</th></tr></thead>'
+                    .'<tbody>'
+                    .$order->items->map(function ($item): string {
                         return sprintf(
                             '<tr><td style="padding: 8px; border: 1px solid #cccccc;">%s</td><td style="padding: 8px; border: 1px solid #cccccc;">%s</td><td align="center" style="padding: 8px; border: 1px solid #cccccc;">%d</td></tr>',
                             e((string) ($item->product?->category?->name ?? '—')),
@@ -380,30 +424,31 @@ final class NotificationListener
                             $item->quantity,
                         );
                     })->implode('')
-                    . '</tbody></table>';
+                    .'</tbody></table>';
 
             $title = 'Payment Successfully Captured — '.$order->displayName();
             $body = '<h2 style="font-family: sans-serif; margin-bottom: 16px;">Payment Successfully Captured</h2>'
-                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Order Details</h3>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Order ID:</strong> #'.e((string) $order->id).'</p>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Public Order ID:</strong> '.e($order->public_id).'</p>'
-                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Order Items</h3>'
-                . $orderItems
-                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Customer Details</h3>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Name:</strong> '.e($customerName).'</p>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Email:</strong> '.e($customerEmail).'</p>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Phone:</strong> '.e($customerPhone).'</p>'
-                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Payment Details</h3>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Amount:</strong> '.e($amount).'</p>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Status:</strong> '.e($status).'</p>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Payment Method:</strong> '.e($paymentMethod).'</p>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Transaction ID:</strong> '.e($transactionId).'</p>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;"><strong>Captured At:</strong> '.e($capturedAt).'</p>'
-                . '<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Action Required</h3>'
-                . '<p style="font-family: sans-serif; margin: 4px 0;">Please proceed with invoice issuance and order processing.</p>';
+                .'<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Order Details</h3>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Order ID:</strong> #'.e((string) $order->id).'</p>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Public Order ID:</strong> '.e($order->public_id).'</p>'
+                .'<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Order Items</h3>'
+                .$orderItems
+                .'<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Customer Details</h3>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Name:</strong> '.e($customerName).'</p>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Email:</strong> '.e($customerEmail).'</p>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Phone:</strong> '.e($customerPhone).'</p>'
+                .'<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Payment Details</h3>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Amount:</strong> '.e($amount).'</p>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Status:</strong> '.e($status).'</p>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Payment Method:</strong> '.e($paymentMethod).'</p>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Transaction ID:</strong> '.e($transactionId).'</p>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;"><strong>Captured At:</strong> '.e($capturedAt).'</p>'
+                .'<h3 style="font-family: sans-serif; margin: 16px 0 8px;">Action Required</h3>'
+                .'<p style="font-family: sans-serif; margin: 4px 0;">Please proceed with invoice issuance and order processing.</p>';
 
-            Log::info('OPS_ORDER_EMAIL_START', [
+            Log::info('OPS_PAYMENT_EMAIL_START', [
                 'to' => $targetEmail,
+                'payment_id' => $event->paymentId,
                 'order_id' => $event->orderId,
                 'title' => $title,
             ]);
@@ -416,12 +461,14 @@ final class NotificationListener
                 ),
             );
 
-            Log::info('OPS_ORDER_EMAIL_QUEUED_OK', [
+            Log::info('OPS_PAYMENT_EMAIL_QUEUED_OK', [
                 'to' => $targetEmail,
+                'payment_id' => $event->paymentId,
                 'order_id' => $event->orderId,
             ]);
         } catch (\Throwable $e) {
-            Log::error('OPS_ORDER_EMAIL_FAILED', [
+            Log::error('OPS_PAYMENT_EMAIL_FAILED', [
+                'payment_id' => $event->paymentId,
                 'order_id' => $event->orderId,
                 'to' => $targetEmail,
                 'error' => $e->getMessage(),

@@ -9,8 +9,10 @@ use App\Exceptions\Maintenance\InvalidMaintenanceTransitionException;
 use App\Models\Machine;
 use App\Models\User;
 use App\Services\Maintenance\MaintenanceScheduler;
+use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -69,6 +71,7 @@ final class AdminMachineService
                 'address.country:id,code',
                 'order:id,public_id,status',
             ])
+            ->with($this->customerAddressEagerLoad())
             ->withCount(['maintenanceRequests as open_requests_count' => function (Builder $q): void {
                 $q->whereIn('status', ['new', 'assigned', 'in_progress']);
             }]);
@@ -99,6 +102,7 @@ final class AdminMachineService
                 'address:id,user_id,country_id,city,label',
                 'address.country:id,code',
             ])
+            ->with($this->customerAddressEagerLoad())
             ->withCount(['maintenanceRequests as open_requests_count' => function (Builder $q): void {
                 $q->whereIn('status', ['new', 'assigned', 'in_progress']);
             }]);
@@ -135,6 +139,7 @@ final class AdminMachineService
                     $q->with(['assignedTo:id,name'])->limit(20);
                 },
             ])
+            ->with($this->customerAddressEagerLoad())
             ->withCount([
                 'maintenanceLogs as total_logs_count',
                 'maintenanceRequests as open_requests_count' => function (Builder $q): void {
@@ -228,6 +233,9 @@ final class AdminMachineService
             throw InvalidMaintenanceTransitionException::resourceTrashed('admin.machines.resource_trashed');
         }
 
+        $beforeOwnerId = (int) $machine->user_id;
+        $beforeProductId = (int) $machine->product_id;
+
         $updated = DB::transaction(function () use ($machine, $payload): Machine {
             /** @var Machine $locked */
             $locked = Machine::query()
@@ -247,13 +255,23 @@ final class AdminMachineService
                 'location_label',
                 'notes',
                 'voltage',
+                'source',
             ] as $key) {
                 if (array_key_exists($key, $payload)) {
                     $attributes[$key] = $payload[$key];
                 }
             }
-            if (array_key_exists('address_id', $payload)) {
-                $attributes['address_id'] = (int) $payload['address_id'];
+            foreach (['user_id', 'product_id', 'address_id'] as $key) {
+                if (array_key_exists($key, $payload)) {
+                    $attributes[$key] = (int) $payload[$key];
+                }
+            }
+            // Nullable FKs — preserve an explicit null instead of casting
+            // it to 0, which would break the foreign key.
+            foreach (['order_id', 'order_installation_id'] as $key) {
+                if (array_key_exists($key, $payload)) {
+                    $attributes[$key] = $payload[$key] !== null ? (int) $payload[$key] : null;
+                }
             }
             if (array_key_exists('is_active', $payload)) {
                 $attributes['is_active'] = (bool) $payload['is_active'];
@@ -302,7 +320,44 @@ final class AdminMachineService
             ],
         );
 
+        // Ownership / product reassignment gets its own audit row so the
+        // history of who a machine belonged to stays reconstructable.
+        if ((int) $updated->user_id !== $beforeOwnerId || (int) $updated->product_id !== $beforeProductId) {
+            $this->logActivity(
+                event: 'admin.machine.reassigned',
+                description: 'Admin reassigned machine',
+                machine: $updated,
+                actor: $actor,
+                properties: [
+                    'ip' => $ip,
+                    'before_user_id' => $beforeOwnerId,
+                    'after_user_id' => (int) $updated->user_id,
+                    'before_product_id' => $beforeProductId,
+                    'after_product_id' => (int) $updated->product_id,
+                ],
+            );
+        }
+
         return $this->find((int) $updated->id);
+    }
+
+    /**
+     * Eager-load spec for the owner's default address so the admin
+     * `customer.address` embed resolves without an N+1. A single row is
+     * fetched per owner (`is_default DESC` — the AddressService keeps the
+     * flag unique per user).
+     *
+     * @return array<string, Closure>
+     */
+    private function customerAddressEagerLoad(): array
+    {
+        return [
+            'user.addresses' => static function (HasMany $query): void {
+                $query->with(['country:id,code', 'region:id,name'])
+                    ->orderByDesc('is_default')
+                    ->limit(1);
+            },
+        ];
     }
 
     /**

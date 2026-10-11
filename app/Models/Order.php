@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Models\OrderMilestone;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\LogOptions;
@@ -35,6 +34,9 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string $public_id
  * @property int $user_id
  * @property int $delivery_address_id
+ * @property string|null $delivery_address_line_1
+ * @property string|null $delivery_city
+ * @property string|null $delivery_country
  * @property int|null $billing_address_id
  * @property int|null $promotion_id
  * @property ProductTerm $term
@@ -88,6 +90,8 @@ final class Order extends Model
         'customer_phone',
         'delivery_address_id',
         'delivery_address_line_1',
+        'delivery_city',
+        'delivery_country',
         'delivery_date',
         'delivery_time_slot',
         'billing_address_id',
@@ -377,7 +381,7 @@ final class Order extends Model
      */
     public function displayName(): string
     {
-        return '#PWT-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+        return '#PWT-'.str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
     }
 
     protected static function newFactory(): OrderFactory

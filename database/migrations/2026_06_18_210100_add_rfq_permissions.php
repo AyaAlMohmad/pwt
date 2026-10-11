@@ -19,18 +19,18 @@ return new class extends Migration
         $update = Permission::findOrCreate('rfq.update', self::GUARD);
 
         // Assign to super_admin if it exists
-        $superAdmin = Role::findByName('super_admin', self::GUARD);
+        $superAdmin = $this->findRole('super_admin');
         if ($superAdmin !== null) {
             $superAdmin->givePermissionTo([$view, $update]);
         }
 
         // Assign view to operations and support (mirrors maintenance.view pattern)
-        $operations = Role::findByName('operations', self::GUARD);
+        $operations = $this->findRole('operations');
         if ($operations !== null) {
             $operations->givePermissionTo($view);
         }
 
-        $support = Role::findByName('support', self::GUARD);
+        $support = $this->findRole('support');
         if ($support !== null) {
             $support->givePermissionTo($view);
         }
@@ -42,9 +42,23 @@ return new class extends Migration
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        Permission::findByName('rfq.view', self::GUARD)?->delete();
-        Permission::findByName('rfq.update', self::GUARD)?->delete();
+        Permission::query()
+            ->whereIn('name', ['rfq.view', 'rfq.update'])
+            ->where('guard_name', self::GUARD)
+            ->delete();
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * Resolve a role without throwing when it does not exist yet — on a
+     * fresh database the migrations run before RolesAndPermissionsSeeder.
+     */
+    private function findRole(string $name): ?Role
+    {
+        return Role::query()
+            ->where('name', $name)
+            ->where('guard_name', self::GUARD)
+            ->first();
     }
 };

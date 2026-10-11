@@ -70,6 +70,7 @@ return [
         'product_inactive' => 'لا يمكن إنشاء جهاز لمنتج غير نشط.',
         'resource_trashed' => 'لا يمكن تعديل جهاز محذوف.',
         'override_requires_interval' => 'لا يمكن تحديد تاريخ الصيانة التالية إلا عند ضبط فترة تغيير الفلتر.',
+        'owner_change_requires_address' => 'نقل الماكينة إلى عميل آخر يتطلب إرسال address_id يخص العميل الجديد.',
         'trashed_forbidden' => 'لست مخولاً لعرض الأجهزة المحذوفة.',
         'forbidden_field' => 'هذا الحقل يديره الخادم ولا يمكن تقديمه هنا.',
     ],

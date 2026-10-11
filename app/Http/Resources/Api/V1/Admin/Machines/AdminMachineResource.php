@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Admin\Machines;
 
+use App\Models\Address;
 use App\Models\Machine;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -104,6 +106,53 @@ class AdminMachineResource extends JsonResource
             'name' => $user->name,
             'email' => $user->email,
             'phone' => $phoneE164,
+            'address' => $this->resolveCustomerAddress($user),
+        ];
+    }
+
+    /**
+     * The customer's default address book entry. Distinct from the
+     * machine's own `address` (the installation site) — for imported
+     * rows the two happen to coincide, but a customer may own machines
+     * installed at several of their addresses.
+     *
+     * Null when `user.addresses` isn't eager-loaded or the customer has
+     * no address at all.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function resolveCustomerAddress(User $user): ?array
+    {
+        if (! $user->relationLoaded('addresses')) {
+            return null;
+        }
+
+        $default = $user->addresses->first(static fn (Address $a): bool => (bool) $a->is_default)
+            ?? $user->addresses->first();
+
+        if ($default === null) {
+            return null;
+        }
+
+        $region = $default->relationLoaded('region') ? $default->region : null;
+        $country = $default->relationLoaded('country') ? $default->country : null;
+        $locale = app()->getLocale();
+
+        return [
+            'id' => $default->id,
+            'label' => $default->label,
+            'line1' => $default->line1,
+            'line2' => $default->line2,
+            'area' => $default->area,
+            'city' => $default->city,
+            'region' => $region !== null
+                ? $region->getTranslation('name', $locale, false)
+                    ?: $region->getTranslation('name', (string) config('app.fallback_locale', 'en'))
+                : null,
+            'country' => $country !== null ? ['code' => $country->code] : null,
+            'latitude' => $default->latitude !== null ? (float) $default->latitude : null,
+            'longitude' => $default->longitude !== null ? (float) $default->longitude : null,
+            'is_default' => (bool) $default->is_default,
         ];
     }
 

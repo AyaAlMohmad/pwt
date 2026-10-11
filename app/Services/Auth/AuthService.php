@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Enums\UserRole;
+use App\Exceptions\Auth\EmailNotVerifiedException;
 use App\Exceptions\Auth\EmailTakenException;
 use App\Exceptions\Auth\InvalidAccountTypeException;
 use App\Exceptions\Auth\InvalidCredentialsException;
@@ -12,6 +13,7 @@ use App\Exceptions\Auth\PhoneTakenException;
 use App\Exceptions\Auth\RegistrationTokenExpiredException;
 use App\Models\Otp;
 use App\Models\User;
+use App\Support\Names\PersonNameNormaliser;
 use App\Support\Phone\PhoneNumberNormaliser;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -103,8 +105,19 @@ final class AuthService
                 'password' => Hash::make(bin2hex(random_bytes(16))),
             ])->save();
         } else {
-            // Update account_type on existing placeholder user
-            $existing->forceFill(['account_type' => $accountType])->save();
+            // Update the existing placeholder user. For inactive placeholders we
+            // clear any leftover email/verification state so the caller has to
+            // re-verify on every fresh registration attempt (from-zero flow).
+            if ($existing->is_active === false) {
+                $existing->tokens()->delete();
+            }
+
+            $existing->forceFill([
+                'account_type' => $accountType,
+                'email' => null,
+                'email_verified_at' => null,
+                'company_name' => null,
+            ])->save();
         }
 
         // Compose the registration token. `name` carries the OTP
@@ -157,10 +170,25 @@ final class AuthService
                 }
             }
 
+            $finalEmail = $payload['email'] ?? $user->email;
+            $emailVerifiedAt = $finalEmail === $user->email ? $user->email_verified_at : null;
+
+            if ($finalEmail === null || $emailVerifiedAt === null) {
+                throw EmailNotVerifiedException::create();
+            }
+
+            $nameData = PersonNameNormaliser::reconcile(
+                $payload,
+                $user->name,
+                $user->first_name,
+                $user->last_name,
+            );
+
             try {
                 $user->forceFill([
-                    'name' => $payload['name'],
-                    'email' => $payload['email'] ?? null,
+                    ...$nameData,
+                    'email' => $finalEmail,
+                    'email_verified_at' => $emailVerifiedAt,
                     'locale' => $payload['locale'] ?? app()->getLocale(),
                     'is_active' => true,
                     'account_type' => $payload['account_type'] ?? $user->account_type ?? 'individual',

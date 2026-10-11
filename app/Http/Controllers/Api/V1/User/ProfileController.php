@@ -12,6 +12,7 @@ use App\Http\Requests\Api\V1\User\UpdateProfileRequest;
 use App\Http\Resources\Api\V1\User\MeResponseResource;
 use App\Models\User;
 use App\Services\Files\FileStorageService;
+use App\Support\Names\PersonNameNormaliser;
 use App\Support\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,14 +74,26 @@ final class ProfileController extends Controller
         $user = $request->user();
         $this->authorize('update', $user);
 
+        $nameInput = array_intersect_key($request->validated(), [
+            'name' => true,
+            'first_name' => true,
+            'last_name' => true,
+        ]);
+
+        $nameData = PersonNameNormaliser::reconcile(
+            $nameInput,
+            $user->name,
+            $user->first_name,
+            $user->last_name,
+        );
+
         $changes = array_filter([
-            'name' => $request->input('name'),
-            'first_name' => $request->input('first_name'),
-            'last_name' => $request->input('last_name'),
             'email' => $request->has('email') ? $request->input('email') : null,
             'locale' => $request->input('locale'),
             'company_name' => $request->input('company_name'),
         ], static fn ($v) => $v !== null);
+
+        $changes = array_merge($changes, $nameData);
 
         // Handle password change
         $newPassword = null;

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Contact\ContactController;
 use App\Http\Controllers\Api\V1\Files\FilesController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\Maintenance\MaintenanceRequestsController;
+use App\Http\Controllers\Api\V1\Me\EmailVerificationController;
 use App\Http\Controllers\Api\V1\Me\MachinesController;
 use App\Http\Controllers\Api\V1\Notifications\NotificationsController;
 use App\Http\Controllers\Api\V1\Orders\OrdersController;
@@ -73,6 +74,14 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/register', [AuthController::class, 'register'])
             ->middleware(['auth:sanctum', 'ability:register-only'])
             ->name('register');
+
+        // Email verification (OTP over email), usable with the register-only token.
+        Route::post('/email-verification', [EmailVerificationController::class, 'send'])
+            ->middleware(['auth:sanctum', 'ability:register-only', 'throttle:otp-request'])
+            ->name('email-verification.send');
+        Route::post('/email-verification/verify', [EmailVerificationController::class, 'verify'])
+            ->middleware(['auth:sanctum', 'ability:register-only', 'throttle:otp-verify'])
+            ->name('email-verification.verify');
 
         Route::post('/login', [AuthController::class, 'login'])
             ->middleware('throttle:auth-strict')

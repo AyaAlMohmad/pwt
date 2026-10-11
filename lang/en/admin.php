@@ -70,6 +70,7 @@ return [
         'product_inactive' => 'Cannot create a machine for an inactive product.',
         'resource_trashed' => 'Cannot modify a trashed machine.',
         'override_requires_interval' => 'The next maintenance due date can only be set when a filter change interval is configured.',
+        'owner_change_requires_address' => 'Reassigning the machine to another customer requires an address_id owned by the new customer.',
         'trashed_forbidden' => 'You are not authorised to view trashed machines.',
         'forbidden_field' => 'This field is server-managed and may not be supplied here.',
     ],

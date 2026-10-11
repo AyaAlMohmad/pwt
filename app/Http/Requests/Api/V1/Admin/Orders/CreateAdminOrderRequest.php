@@ -71,6 +71,7 @@ final class CreateAdminOrderRequest extends FormRequest
             'items.*.product_id' => ['required', 'integer', new ActiveProduct],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:50'],
             'items.*.term' => ['required', 'string', 'in:'.implode(',', ProductTerm::values())],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
 
             // Customer contact info
             'customer_name' => ['required', 'string', 'min:2', 'max:120'],
@@ -85,6 +86,8 @@ final class CreateAdminOrderRequest extends FormRequest
                 new OwnedAddress($targetUserId),
             ],
             'delivery_address_line_1' => ['nullable', 'string', 'max:255'],
+            'delivery_city' => ['nullable', 'string', 'max:120'],
+            'delivery_country' => ['nullable', 'string', 'max:120'],
             'delivery_date' => ['required', 'date', 'after_or_equal:today'],
             'delivery_time_slot' => ['required', 'string', 'in:morning,afternoon,evening'],
 

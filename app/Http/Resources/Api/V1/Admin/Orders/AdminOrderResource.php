@@ -6,6 +6,7 @@ namespace App\Http\Resources\Api\V1\Admin\Orders;
 
 use App\Http\Resources\Api\V1\Addresses\AddressResource;
 use App\Models\Order;
+use App\Models\OrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -50,6 +51,9 @@ class AdminOrderResource extends JsonResource
             'remaining_items_count' => max(0, $this->resolveItemsCount($order) - 1),
             'customer' => $this->resolveCustomerSmall($order),
             'country_code' => $this->resolveCountryCode($order),
+            'delivery_address_line_1' => $order->delivery_address_line_1,
+            'delivery_city' => $order->delivery_city,
+            'delivery_country' => $order->delivery_country,
             'placed_at' => $order->created_at->toIso8601String(),
             'confirmed_at' => $order->confirmed_at?->toIso8601String(),
             'scheduled_for_at' => $order->scheduled_for_at?->toIso8601String(),
@@ -123,15 +127,21 @@ class AdminOrderResource extends JsonResource
 
     protected function resolveCountryCode(Order $order): ?string
     {
-        if (! $order->relationLoaded('deliveryAddress') || $order->deliveryAddress === null) {
-            return null;
+        if ($order->relationLoaded('deliveryAddress') && $order->deliveryAddress !== null) {
+            $country = $order->deliveryAddress->relationLoaded('country')
+                ? $order->deliveryAddress->country
+                : null;
+
+            if ($country?->code !== null) {
+                return $country->code;
+            }
         }
 
-        $country = $order->deliveryAddress->relationLoaded('country')
-            ? $order->deliveryAddress->country
-            : null;
+        if (is_string($order->delivery_country) && strlen($order->delivery_country) <= 3) {
+            return strtoupper($order->delivery_country);
+        }
 
-        return $country?->code;
+        return null;
     }
 
     /**
@@ -145,7 +155,7 @@ class AdminOrderResource extends JsonResource
             return null;
         }
 
-        /** @var \App\Models\OrderItem $first */
+        /** @var OrderItem $first */
         $first = $order->items->first();
         $locale = app()->getLocale();
 

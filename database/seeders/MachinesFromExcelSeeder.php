@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\AccountType;
 use App\Enums\MachineSource;
 use App\Enums\MaintenanceLogSource;
 use App\Enums\MaintenanceLogStatus;
@@ -247,14 +248,17 @@ final class MachinesFromExcelSeeder extends Seeder
         }
 
         $email = $this->resolveEmail($emailH, $emailI, $countryCode, $rowNumber);
-        $nameFallback = $this->resolveCustomerName($emailH, $emailI, $location);
+        $customerName = $this->resolveCustomerName($location);
+        $contactName = $this->resolveContactName($emailH, $emailI);
+        $contactEmail = $this->resolveContactEmail($emailH, $emailI);
 
         try {
             DB::transaction(function () use (
                 $sheet, $rowNumber, $sheetName, $countryCode, $product, $serialRaw,
-                $termRaw, $installedAt, $filterIntervalRaw, $location, $email, $nameFallback,
+                $termRaw, $installedAt, $filterIntervalRaw, $location, $email, $customerName,
+                $contactName, $contactEmail,
             ): void {
-                $user = $this->firstOrCreateUser($email, $nameFallback, $countryCode);
+                $user = $this->firstOrCreateUser($email, $customerName, $contactName, $contactEmail, $countryCode);
                 $address = $this->firstOrCreateAddress($user, $location, $countryCode);
 
                 $serial = $this->resolveSerial($serialRaw, $sheetName, $rowNumber);
@@ -385,37 +389,153 @@ final class MachinesFromExcelSeeder extends Seeder
 
     private function resolveEmail(string $h, string $i, string $countryCode, int $rowNumber): string
     {
-        $candidates = [trim($h), trim($i)];
-        foreach ($candidates as $candidate) {
-            if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
-                return strtolower($candidate);
-            }
-        }
-
-        return sprintf(
+        return $this->resolveContactEmail($h, $i) ?? sprintf(
             'unknown+row%d-%s@pwt.local',
             $rowNumber,
             strtolower($countryCode),
         );
     }
 
-    private function resolveCustomerName(string $h, string $i, string $location): string
+    private function resolveCustomerName(string $location): string
     {
-        foreach ([trim($h), trim($i)] as $candidate) {
-            if ($candidate === '' || filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
-                continue;
-            }
-
-            return Str::limit($candidate, 120, '');
-        }
-
         return Str::limit($location !== '' ? $location : 'PWT Customer', 120, '');
     }
 
-    private function firstOrCreateUser(string $email, string $name, string $countryCode): User
+    private function resolveContactEmail(string $h, string $i): ?string
     {
+        foreach ([trim($h), trim($i)] as $candidate) {
+            if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
+                return strtolower($candidate);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Decide what lands in `first_name` / `last_name`.
+     *
+     * The contact person (column H/I) owns those columns. Rows where both
+     * cells are blank or hold only an email fall back to splitting the
+     * customer label so the columns are never left empty.
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private function resolvePersonName(?string $contactName, string $customerName): array
+    {
+        if ($contactName !== null && trim($contactName) !== '') {
+            return $this->splitContactName($contactName);
+        }
+
+        return $this->splitName($customerName);
+    }
+
+    /**
+     * Split a contact person's name into first / last on whitespace —
+     * the leading word becomes `first_name`, the remainder `last_name`
+     * ("Mhd Kamran Qureshi" → "Mhd" + "Kamran Qureshi").
+     *
+     * Cells holding several contacts ("Rabih Abboud / Larissa") belong to
+     * one account row, so only the first person is used; the raw value is
+     * still preserved in full on `contact_name`.
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private function splitContactName(string $contactName): array
+    {
+        $segments = preg_split('#\s*/\s*#u', $contactName, 2);
+        $primary = trim((string) ($segments[0] ?? ''));
+        if ($primary === '') {
+            $primary = trim($contactName);
+        }
+
+        $parts = preg_split('/\s+/u', $primary, 2);
+        $first = trim((string) ($parts[0] ?? ''));
+        $last = trim((string) ($parts[1] ?? ''));
+
+        return [
+            Str::limit($first !== '' ? $first : $primary, 60, ''),
+            $last !== '' ? Str::limit($last, 60, '') : null,
+        ];
+    }
+
+    /**
+     * Split an imported customer label on its dash — the workbook stores
+     * them as "Brand- Branch" (e.g. "Paul Cafe- Dubai Mall"), so the part
+     * before the dash becomes `first_name` and the part after becomes
+     * `last_name`.
+     *
+     * The dash must be padded by whitespace on at least one side,
+     * otherwise hyphenated words ("V-Kool Emirates", "Omar Al-Sai") would
+     * be torn apart. A bare dash is only honoured when the whole label is
+     * exactly two dash-joined words ("NBK-Headquarters"). Labels with no
+     * usable dash keep the full value as `first_name` and leave
+     * `last_name` null.
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private function splitName(string $name): array
+    {
+        $first = $name;
+        $last = '';
+
+        $parts = preg_split('/(?:\s+[-–—]\s*|[-–—]\s+)/u', $name, 2);
+        if (is_array($parts) && count($parts) === 2) {
+            $first = $parts[0];
+            $last = $parts[1];
+        } elseif (preg_match('/^([^\s\-–—]+)[-–—]([^\-–—]+)$/u', $name, $matches) === 1) {
+            $first = $matches[1];
+            $last = $matches[2];
+        }
+
+        $first = trim($first);
+        $last = trim($last);
+
+        return [
+            Str::limit($first !== '' ? $first : $name, 60, ''),
+            $last !== '' ? Str::limit($last, 60, '') : null,
+        ];
+    }
+
+    private function resolveContactName(string $h, string $i): ?string
+    {
+        foreach ([trim($h), trim($i)] as $candidate) {
+            if ($candidate !== '' && ! filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
+                return Str::limit($candidate, 120, '');
+            }
+        }
+
+        return null;
+    }
+
+    private function firstOrCreateUser(
+        string $email,
+        string $name,
+        ?string $contactName,
+        ?string $contactEmail,
+        string $countryCode,
+    ): User {
+        [$firstName, $lastName] = $this->resolvePersonName($contactName, $name);
+
         $existing = User::query()->where('email', $email)->first();
         if ($existing !== null) {
+            // Backfill rows imported before the split-name / company
+            // columns existed. Only touched while both name parts are
+            // still empty, so an operator's manual edits are never
+            // overwritten on a re-run.
+            if ($existing->first_name === null && $existing->last_name === null) {
+                [$existingFirst, $existingLast] = $this->resolvePersonName(
+                    $existing->contact_name,
+                    $existing->name,
+                );
+                $existing->update([
+                    'first_name' => $existingFirst,
+                    'last_name' => $existingLast,
+                    'account_type' => AccountType::Company->value,
+                    'company_name' => $existing->name,
+                ]);
+            }
+
             return $existing;
         }
 
@@ -424,13 +544,19 @@ final class MachinesFromExcelSeeder extends Seeder
 
         $user = User::query()->create([
             'name' => $name,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'account_type' => AccountType::Company->value,
+            'company_name' => $name,
             'email' => $email,
             'phone_country_code' => $countryPrefix,
             'phone' => $phone,
             'locale' => 'en',
             'is_active' => true,
             'email_verified_at' => now(),
-            'password' => Hash::make(Str::random(40)),
+            'password' => Hash::make('password123'),
+            'contact_name' => $contactName,
+            'contact_email' => $contactEmail,
         ]);
 
         $user->assignRole(UserRole::Customer->value);
