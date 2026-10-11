@@ -253,12 +253,12 @@ $matrix = [
     // new → ...
     [MaintenanceStatus::New, MaintenanceStatus::Assigned, true],
     [MaintenanceStatus::New, MaintenanceStatus::Cancelled, true],
-    [MaintenanceStatus::New, MaintenanceStatus::InProgress, false],
+    [MaintenanceStatus::New, MaintenanceStatus::InProgress, true],
     [MaintenanceStatus::New, MaintenanceStatus::Completed, false],
     // assigned → ...
     [MaintenanceStatus::Assigned, MaintenanceStatus::InProgress, true],
     [MaintenanceStatus::Assigned, MaintenanceStatus::Cancelled, true],
-    [MaintenanceStatus::Assigned, MaintenanceStatus::New, false],
+    [MaintenanceStatus::Assigned, MaintenanceStatus::New, true],
     [MaintenanceStatus::Assigned, MaintenanceStatus::Completed, false],
     // in_progress → ...
     [MaintenanceStatus::InProgress, MaintenanceStatus::Completed, true],

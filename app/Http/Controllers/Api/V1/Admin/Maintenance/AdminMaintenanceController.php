@@ -183,7 +183,7 @@ final class AdminMaintenanceController extends Controller
     #[OA\Patch(
         path: '/api/v1/admin/maintenance-requests/{id}/assign',
         operationId: 'adminMaintenanceAssign',
-        description: 'Assign or re-assign a technician (operations admin). From `new`: transitions to `assigned`. From `assigned`: idempotent re-assignment with notes-only history row.',
+        description: 'Assign or re-assign a technician (operations admin). From `new`: transitions to `assigned`. From `assigned`: idempotent re-assignment with notes-only history row. Omitting assigned_to_user_id unassigns — an `assigned` request returns to `new`.',
         summary: 'Assign maintenance request (admin)',
         security: [['sanctum' => []]],
         requestBody: new OA\RequestBody(required: true,

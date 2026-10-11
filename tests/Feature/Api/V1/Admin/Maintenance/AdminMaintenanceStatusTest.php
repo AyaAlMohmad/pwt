@@ -79,6 +79,43 @@ describe('PATCH /api/v1/admin/maintenance-requests/{id}/status', function (): vo
         ]);
     });
 
+    it('accepts a numeric status code (3 = in_progress)', function (): void {
+        [, $bearer] = statusAdminBearerMaint();
+        $req = statusBuildRequest(); // assigned
+
+        $this->withHeader('Authorization', $bearer)
+            ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/status", [
+                'status' => 3,
+                'note' => 'Technician on site',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::InProgress->value);
+    });
+
+    it('accepts a numeric status code as a string ("5" = cancelled)', function (): void {
+        [, $bearer] = statusAdminBearerMaint();
+        $req = statusBuildRequest(['status' => MaintenanceStatus::New->value, 'assigned_to_user_id' => null]);
+
+        $this->withHeader('Authorization', $bearer)
+            ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/status", [
+                'status' => '5',
+                'reason' => 'Duplicate ticket — closing.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::Cancelled->value);
+    });
+
+    it('rejects an unknown numeric status code with 422', function (): void {
+        [, $bearer] = statusAdminBearerMaint();
+        $req = statusBuildRequest();
+
+        $this->withHeader('Authorization', $bearer)
+            ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/status", [
+                'status' => 99,
+            ])
+            ->assertStatus(422);
+    });
+
     it('rejects status=assigned with 409 ERR_USE_ASSIGN_ENDPOINT', function (): void {
         [, $bearer] = statusAdminBearerMaint();
         $req = statusBuildRequest(['status' => MaintenanceStatus::New->value, 'assigned_to_user_id' => null]);
@@ -165,7 +202,7 @@ describe('PATCH /api/v1/admin/maintenance-requests/{id}/status', function (): vo
             ->assertJsonStructure(['errors' => ['reason']]);
     });
 
-    it('rejects new → in_progress (must be assigned first) with 409', function (): void {
+    it('allows new → in_progress (technician assignment is optional)', function (): void {
         [, $bearer] = statusAdminBearerMaint();
         $req = statusBuildRequest(['status' => MaintenanceStatus::New->value, 'assigned_to_user_id' => null]);
 
@@ -173,8 +210,8 @@ describe('PATCH /api/v1/admin/maintenance-requests/{id}/status', function (): vo
             ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/status", [
                 'status' => MaintenanceStatus::InProgress->value,
             ])
-            ->assertStatus(409)
-            ->assertJsonPath('code', 'ERR_INVALID_STATUS_TRANSITION');
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::InProgress->value);
     });
 
     it('rejects cancelling an already-completed request with 409', function (): void {

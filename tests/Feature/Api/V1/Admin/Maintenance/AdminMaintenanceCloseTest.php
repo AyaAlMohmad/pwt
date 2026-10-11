@@ -156,14 +156,41 @@ describe('POST /api/v1/admin/maintenance-requests/{id}/close', function (): void
             ->assertJsonStructure(['errors' => ['completed_at']]);
     });
 
-    it('rejects missing resolution_notes with 422', function (): void {
+    it('closes without resolution_notes — the field is optional', function (): void {
         [, $bearer] = closeAdminBearer();
         ['request' => $req] = closeBuildRequest();
 
         $this->withHeader('Authorization', $bearer)
             ->postJson("/api/v1/admin/maintenance-requests/{$req->id}/close", [])
-            ->assertStatus(422)
-            ->assertJsonStructure(['errors' => ['resolution_notes']]);
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::Completed->value)
+            ->assertJsonPath('data.resolution_notes', null);
+
+        $log = MachineMaintenanceLog::query()->where('maintenance_request_id', $req->id)->first();
+        expect($log)->not->toBeNull()->and($log->notes)->toBeNull();
+    });
+
+    it('computes next_maintenance_due_at from the supplied completed_at + interval', function (): void {
+        [, $bearer] = closeAdminBearer();
+        $completedAt = now()->subDays(10)->toDateString();
+        ['request' => $req, 'machine' => $machine] = closeBuildRequest(
+            // completed_at must be >= request.created_at — backdate it.
+            ['created_at' => now()->subDays(20)],
+            [
+                'filter_change_interval_months' => 3,
+                'installed_at' => now()->subMonths(2)->toDateString(),
+            ],
+        );
+
+        $this->withHeader('Authorization', $bearer)
+            ->postJson("/api/v1/admin/maintenance-requests/{$req->id}/close", [
+                'completed_at' => $completedAt,
+            ])
+            ->assertOk();
+
+        $machine->refresh();
+        expect($machine->next_maintenance_due_at?->toDateString())
+            ->toBe(now()->subDays(10)->addMonths(3)->toDateString());
     });
 
     it('returns 403 for support role', function (): void {

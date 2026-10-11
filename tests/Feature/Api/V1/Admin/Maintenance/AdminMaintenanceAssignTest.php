@@ -148,6 +148,45 @@ describe('PATCH /api/v1/admin/maintenance-requests/{id}/assign', function (): vo
         expect($historyRows->first()->note)->toBe('Re-assigned to Ali — Hassan unavailable.');
     });
 
+    it('unassigns an assigned request — null technician returns it to new', function (): void {
+        [, $bearer] = assignAdminBearer();
+        $technician = User::factory()->admin(UserRole::Operations->value)->create();
+        $req = assignBuildRequest([
+            'status' => MaintenanceStatus::Assigned->value,
+            'assigned_to_user_id' => $technician->id,
+        ]);
+
+        $this->withHeader('Authorization', $bearer)
+            ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/assign", [
+                'assigned_to_user_id' => null,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::New->value)
+            ->assertJsonPath('data.assigned_to', null);
+
+        $this->assertDatabaseHas('maintenance_requests', [
+            'id' => $req->id,
+            'status' => MaintenanceStatus::New->value,
+            'assigned_to_user_id' => null,
+        ]);
+
+        $this->assertDatabaseHas('maintenance_status_history', [
+            'maintenance_request_id' => $req->id,
+            'from_status' => MaintenanceStatus::Assigned->value,
+            'to_status' => MaintenanceStatus::New->value,
+        ]);
+    });
+
+    it('accepts a missing technician on a new request (idempotent no-op)', function (): void {
+        [, $bearer] = assignAdminBearer();
+        $req = assignBuildRequest();
+
+        $this->withHeader('Authorization', $bearer)
+            ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/assign", [])
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::New->value);
+    });
+
     it('rejects assigning a cancelled request with 409 ERR_INVALID_STATUS_TRANSITION', function (): void {
         [, $bearer] = assignAdminBearer();
         $technician = User::factory()->admin(UserRole::Operations->value)->create();

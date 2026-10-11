@@ -51,10 +51,15 @@ enum MaintenanceStatus: string
         return [
             self::New->value => [
                 self::Assigned->value,
+                // Technician assignment is optional — a request may
+                // go straight to in_progress without an assignee.
+                self::InProgress->value,
                 self::Cancelled->value,
             ],
             self::Assigned->value => [
                 self::InProgress->value,
+                // Unassigning returns the request to `new`.
+                self::New->value,
                 self::Cancelled->value,
             ],
             self::InProgress->value => [
@@ -69,5 +74,36 @@ enum MaintenanceStatus: string
     public function canTransitionTo(self $target): bool
     {
         return in_array($target->value, self::transitionsAllowed()[$this->value] ?? [], true);
+    }
+
+    /**
+     * Numeric code accepted on the wire (e.g. admin status payloads).
+     * Codes follow the enum declaration order.
+     */
+    public function code(): int
+    {
+        return match ($this) {
+            self::New => 1,
+            self::Assigned => 2,
+            self::InProgress => 3,
+            self::Completed => 4,
+            self::Cancelled => 5,
+        };
+    }
+
+    /**
+     * Resolve a numeric status code to its case. Returns null for
+     * unknown codes so callers can surface a validation error.
+     */
+    public static function tryFromCode(int $code): ?self
+    {
+        return match ($code) {
+            1 => self::New,
+            2 => self::Assigned,
+            3 => self::InProgress,
+            4 => self::Completed,
+            5 => self::Cancelled,
+            default => null,
+        };
     }
 }

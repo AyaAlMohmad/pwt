@@ -13,6 +13,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // The column only exists on databases migrated from the
+        // pre-rename schema — fresh installs never had it.
+        if (! Schema::hasColumn('maintenance_requests', 'time_slot')) {
+            return;
+        }
+
         Schema::table('maintenance_requests', function (Blueprint $table): void {
             $table->dropColumn('time_slot');
         });

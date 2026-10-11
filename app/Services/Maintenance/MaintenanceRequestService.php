@@ -322,7 +322,7 @@ final class MaintenanceRequestService
                 'to_status' => $locked->status->value,
                 'actor_type' => MaintenanceActorType::Customer->value,
                 'actor_id' => $actor->id,
-                'note' => "Rescheduled from {$oldDate} ({$oldTime}) to {$payload['preferred_date']} (" . ($payload['preferred_time'] ?? 'anytime') . ').',
+                'note' => "Rescheduled from {$oldDate} ({$oldTime}) to {$payload['preferred_date']} (".($payload['preferred_time'] ?? 'anytime').').',
             ]);
 
             return $this->eagerLoad($locked->refresh());
@@ -398,9 +398,13 @@ final class MaintenanceRequestService
             }
 
             // Side-effects: closed_at on terminal transitions, optional
-            // resolution_notes on `completed`.
+            // resolution_notes on `completed`. A return to `new`
+            // (unassign) clears the technician slot.
             if ($toStatus->isTerminal() && $locked->closed_at === null) {
                 $locked->closed_at = now();
+            }
+            if ($toStatus === MaintenanceStatus::New) {
+                $locked->assigned_to_user_id = null;
             }
             if (
                 $toStatus === MaintenanceStatus::Completed

@@ -30,7 +30,7 @@ final class CloseMaintenanceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'resolution_notes' => ['required', 'string', 'min:5', 'max:2000'],
+            'resolution_notes' => ['nullable', 'string', 'min:5', 'max:2000'],
             'completed_at' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
 
             // Server-managed — reject explicit attempts.

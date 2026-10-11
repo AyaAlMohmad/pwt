@@ -415,7 +415,11 @@ final class AdminMaintenanceService
             throw InvalidMaintenanceTransitionException::resourceTrashed();
         }
 
-        $technicianId = (int) $payload['assigned_to_user_id'];
+        // Null / omitted technician = unassign. The Form Request marks
+        // the field nullable; a numeric zero is treated as null too.
+        $technicianId = isset($payload['assigned_to_user_id']) && is_numeric($payload['assigned_to_user_id']) && (int) $payload['assigned_to_user_id'] > 0
+            ? (int) $payload['assigned_to_user_id']
+            : null;
         $note = isset($payload['note']) && is_string($payload['note']) ? $payload['note'] : null;
 
         $updated = DB::transaction(function () use ($request, $technicianId, $note, $actor): MaintenanceRequest {
@@ -426,6 +430,29 @@ final class AdminMaintenanceService
                 ->firstOrFail();
 
             $currentStatus = $locked->status;
+
+            // Unassign: `assigned` returns to `new` (transitionTo clears
+            // assigned_to_user_id); `new` is an idempotent no-op.
+            if ($technicianId === null) {
+                if ($currentStatus === MaintenanceStatus::Assigned) {
+                    return $this->requests->transitionTo(
+                        r: $locked,
+                        toStatus: MaintenanceStatus::New,
+                        actor: $actor,
+                        actorType: MaintenanceActorType::Admin,
+                        payload: ['note' => $note ?? 'Unassigned'],
+                    );
+                }
+
+                if ($currentStatus === MaintenanceStatus::New) {
+                    $locked->assigned_to_user_id = null;
+                    $locked->save();
+
+                    return $locked;
+                }
+
+                throw InvalidMaintenanceTransitionException::cannotAssignInState($currentStatus);
+            }
 
             if ($currentStatus === MaintenanceStatus::New) {
                 // First assignment: transition new -> assigned.
@@ -499,8 +526,13 @@ final class AdminMaintenanceService
             throw InvalidMaintenanceTransitionException::resourceTrashed();
         }
 
-        $statusRaw = (string) ($payload['status'] ?? '');
-        $target = MaintenanceStatus::tryFrom($statusRaw);
+        // Numeric codes (1..5) resolve via tryFromCode — the Form
+        // Request already normalises them, this is defence-in-depth
+        // for callers that bypass it.
+        $statusRaw = $payload['status'] ?? '';
+        $target = is_int($statusRaw) || (is_string($statusRaw) && ctype_digit($statusRaw))
+            ? MaintenanceStatus::tryFromCode((int) $statusRaw)
+            : MaintenanceStatus::tryFrom((string) $statusRaw);
         if ($target === null) {
             throw InvalidMaintenanceTransitionException::from($request->status, $request->status);
         }
@@ -574,7 +606,11 @@ final class AdminMaintenanceService
             throw InvalidMaintenanceTransitionException::resourceTrashed();
         }
 
-        $resolutionNotes = (string) $payload['resolution_notes'];
+        // resolution_notes is optional — absent/blank stores NULL on
+        // both the request and the maintenance log row.
+        $resolutionNotes = isset($payload['resolution_notes']) && is_string($payload['resolution_notes']) && trim($payload['resolution_notes']) !== ''
+            ? $payload['resolution_notes']
+            : null;
         $completedAt = isset($payload['completed_at']) && is_string($payload['completed_at']) && $payload['completed_at'] !== ''
             ? Carbon::parse($payload['completed_at'])
             : Carbon::now();

@@ -12,6 +12,8 @@ use Illuminate\Foundation\Http\FormRequest;
  *
  * The `assigned_to_user_id` must reference an active admin holding the
  * `operations` role (MVP technician proxy — orchestrator decision 1).
+ * It is nullable: omitting it (or sending null) unassigns the request
+ * and returns an `assigned` request to `new`.
  *
  * See docs/architecture/admin-machines-maintenance.md § 3.7.
  */
@@ -28,7 +30,7 @@ final class AssignMaintenanceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'assigned_to_user_id' => ['required', 'integer', 'exists:users,id', new IsAdminInRole('operations')],
+            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id', new IsAdminInRole('operations')],
             'note' => ['nullable', 'string', 'min:3', 'max:500'],
 
             // Server-managed — reject explicit attempts.
