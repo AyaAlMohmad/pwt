@@ -4,17 +4,24 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Admin\Machines;
 
+use App\Enums\MaintenanceStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Admin\Machines\CloseMachineMaintenanceRequest;
 use App\Http\Requests\Api\V1\Admin\Machines\CreateMachineRequest;
 use App\Http\Requests\Api\V1\Admin\Machines\DueMaintenanceRequest;
 use App\Http\Requests\Api\V1\Admin\Machines\ListAdminMachinesRequest;
+use App\Http\Requests\Api\V1\Admin\Machines\UpdateMachineMaintenanceStatusRequest;
 use App\Http\Requests\Api\V1\Admin\Machines\UpdateMachineRequest;
 use App\Http\Resources\Api\V1\Admin\Machines\AdminMachineDetailResource;
 use App\Http\Resources\Api\V1\Admin\Machines\AdminMachineResource;
+use App\Http\Resources\Api\V1\Admin\Maintenance\AdminMaintenanceRequestDetailResource;
 use App\Models\Machine;
+use App\Models\MaintenanceRequest;
 use App\Models\User;
 use App\Policies\MachinePolicy;
+use App\Policies\MaintenanceRequestPolicy;
 use App\Services\Admin\AdminMachineService;
+use App\Services\Admin\AdminMaintenanceService;
 use App\Support\Http\ApiResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +41,7 @@ final class AdminMachinesController extends Controller
 {
     public function __construct(
         private readonly AdminMachineService $service,
+        private readonly AdminMaintenanceService $maintenanceService,
     ) {}
 
     #[OA\Get(
@@ -250,6 +258,114 @@ final class AdminMachinesController extends Controller
         return ApiResponse::success(
             (new AdminMachineDetailResource($updated))->resolve($request),
             __('admin.machines.updated'),
+        );
+    }
+
+    #[OA\Patch(
+        path: '/api/v1/admin/machines/{id}/maintenance-status',
+        operationId: 'adminMachineUpdateMaintenanceStatus',
+        description: 'Update the status of the latest open maintenance request for a machine. Returns the updated maintenance request detail. If no open request exists, returns 404.',
+        summary: 'Update machine maintenance status (admin)',
+        security: [['sanctum' => []]],
+        requestBody: new OA\RequestBody(required: true,
+            content: new OA\JsonContent(ref: '#/components/schemas/UpdateAdminMaintenanceStatusRequest')),
+        tags: ['Admin / Machines'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1)),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Updated',
+                content: new OA\JsonContent(ref: '#/components/schemas/AdminMaintenanceDetailResponse')),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 403, description: 'Forbidden',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 409, description: 'Invalid state transition',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 422, description: 'Validation failed',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
+    public function updateMaintenanceStatus(UpdateMachineMaintenanceStatusRequest $request, int $id): JsonResponse
+    {
+        $machine = $this->service->find($id);
+        $this->authorize('updateAdmin', $machine);
+
+        /** @var User $actor */
+        $actor = $request->user();
+        $payload = $request->validated();
+
+        $openRequest = $this->maintenanceService->findOrCreateOpenRequestForMachine($machine, $actor);
+
+        $this->authorize('updateStatusAdmin', $openRequest);
+
+        $updated = $this->maintenanceService->transition($openRequest, $payload, $actor, $request->ip());
+
+        return ApiResponse::success(
+            (new AdminMaintenanceRequestDetailResource($updated))->resolve($request),
+            __('admin.maintenance.status_updated'),
+        );
+    }
+
+    #[OA\Post(
+        path: '/api/v1/admin/machines/{id}/maintenance-close',
+        operationId: 'adminMachineCloseMaintenanceStatus',
+        description: 'Close (complete) the latest in_progress maintenance request for a machine. Writes resolution_notes, inserts a machine_maintenance_logs row, recomputes next_maintenance_due_at.',
+        summary: 'Close machine maintenance request (admin)',
+        security: [['sanctum' => []]],
+        requestBody: new OA\RequestBody(required: true,
+            content: new OA\JsonContent(ref: '#/components/schemas/CloseMaintenanceRequest')),
+        tags: ['Admin / Machines'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1)),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Closed',
+                content: new OA\JsonContent(ref: '#/components/schemas/AdminMaintenanceDetailResponse')),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 403, description: 'Forbidden',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 409, description: 'Only in_progress requests can be closed',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 422, description: 'Validation failed',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
+    public function closeMaintenanceStatus(CloseMachineMaintenanceRequest $request, int $id): JsonResponse
+    {
+        $machine = $this->service->find($id);
+        $this->authorize('updateAdmin', $machine);
+
+        /** @var User $actor */
+        $actor = $request->user();
+        $payload = $request->validated();
+
+        $openRequest = $this->maintenanceService->findOrCreateOpenRequestForMachine($machine, $actor);
+
+        // Close requires in_progress status. Auto-transition if needed.
+        if ($openRequest->status !== MaintenanceStatus::InProgress) {
+            $openRequest = $this->maintenanceService->transition(
+                $openRequest,
+                ['status' => MaintenanceStatus::InProgress->value, 'reason' => 'Auto-transition for close'],
+                $actor,
+                $request->ip(),
+            );
+        }
+
+        $this->authorize('closeAdmin', $openRequest);
+
+        $updated = $this->maintenanceService->close($openRequest, $payload, $actor, $request->ip());
+
+        return ApiResponse::success(
+            (new AdminMaintenanceRequestDetailResource($updated))->resolve($request),
+            __('admin.maintenance.closed'),
         );
     }
 }

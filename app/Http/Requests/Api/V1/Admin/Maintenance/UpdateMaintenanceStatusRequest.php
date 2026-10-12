@@ -60,8 +60,7 @@ final class UpdateMaintenanceStatusRequest extends FormRequest
             // the specific 409 codes (ERR_USE_ASSIGN_ENDPOINT /
             // ERR_USE_CLOSE_ENDPOINT) rather than a generic 422.
             'status' => ['required', 'string', 'in:in_progress,cancelled,assigned,completed,new'],
-            'note' => ['nullable', 'string', 'min:3', 'max:500'],
-            'reason' => ['required_if:status,cancelled', 'string', 'min:3', 'max:1000'],
+            'reason' => ['nullable', 'string', 'min:3', 'max:1000'],
 
             // Server-managed — reject explicit attempts.
             'assigned_to_user_id' => ['prohibited'],

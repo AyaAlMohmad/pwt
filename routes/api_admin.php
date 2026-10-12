@@ -137,6 +137,12 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function (): void {
         Route::put('/{id}', [AdminMachinesController::class, 'update'])
             ->whereNumber('id')
             ->name('update');
+        Route::patch('/{id}/maintenance-status', [AdminMachinesController::class, 'updateMaintenanceStatus'])
+            ->whereNumber('id')
+            ->name('maintenance-status');
+        Route::post('/{id}/maintenance-close', [AdminMachinesController::class, 'closeMaintenanceStatus'])
+            ->whereNumber('id')
+            ->name('maintenance-close');
     });
 
     // Phase 18 — Admin Maintenance Requests.

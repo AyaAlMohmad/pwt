@@ -67,7 +67,7 @@ describe('PATCH /api/v1/admin/maintenance-requests/{id}/status', function (): vo
         $response = $this->withHeader('Authorization', $bearer)
             ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/status", [
                 'status' => MaintenanceStatus::InProgress->value,
-                'note' => 'Technician on site',
+                'reason' => 'Technician on site',
             ]);
 
         $response->assertOk()
@@ -86,7 +86,7 @@ describe('PATCH /api/v1/admin/maintenance-requests/{id}/status', function (): vo
         $this->withHeader('Authorization', $bearer)
             ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/status", [
                 'status' => 3,
-                'note' => 'Technician on site',
+                'reason' => 'Technician on site',
             ])
             ->assertOk()
             ->assertJsonPath('data.status', MaintenanceStatus::InProgress->value);
@@ -190,7 +190,7 @@ describe('PATCH /api/v1/admin/maintenance-requests/{id}/status', function (): vo
             ->assertJsonPath('data.status', MaintenanceStatus::Cancelled->value);
     });
 
-    it('rejects cancellation without reason with 422', function (): void {
+    it('cancels without reason when reason is optional', function (): void {
         [, $bearer] = statusAdminBearerMaint();
         $req = statusBuildRequest(['status' => MaintenanceStatus::Assigned->value]);
 
@@ -198,8 +198,13 @@ describe('PATCH /api/v1/admin/maintenance-requests/{id}/status', function (): vo
             ->patchJson("/api/v1/admin/maintenance-requests/{$req->id}/status", [
                 'status' => MaintenanceStatus::Cancelled->value,
             ])
-            ->assertStatus(422)
-            ->assertJsonStructure(['errors' => ['reason']]);
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::Cancelled->value);
+
+        $this->assertDatabaseHas('maintenance_requests', [
+            'id' => $req->id,
+            'status' => MaintenanceStatus::Cancelled->value,
+        ]);
     });
 
     it('allows new → in_progress (technician assignment is optional)', function (): void {

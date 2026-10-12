@@ -73,6 +73,7 @@ return [
         'owner_change_requires_address' => 'نقل الماكينة إلى عميل آخر يتطلب إرسال address_id يخص العميل الجديد.',
         'trashed_forbidden' => 'لست مخولاً لعرض الأجهزة المحذوفة.',
         'forbidden_field' => 'هذا الحقل يديره الخادم ولا يمكن تقديمه هنا.',
+        'no_open_maintenance_request' => 'لا يوجد طلب صيانة مفتوح لهذا الجهاز.',
     ],
 
     // Maintenance (Phase 18)

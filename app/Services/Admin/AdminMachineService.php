@@ -72,6 +72,12 @@ final class AdminMachineService
                 'order:id,public_id,status',
             ])
             ->with($this->customerAddressEagerLoad())
+            ->with(['maintenanceRequests' => function ($q): void {
+                $q->whereIn('status', ['new', 'assigned', 'in_progress'])
+                    ->with(['assignedTo:id,name'])
+                    ->latest('id')
+                    ->limit(1);
+            }])
             ->withCount(['maintenanceRequests as open_requests_count' => function (Builder $q): void {
                 $q->whereIn('status', ['new', 'assigned', 'in_progress']);
             }]);
@@ -103,6 +109,12 @@ final class AdminMachineService
                 'address.country:id,code',
             ])
             ->with($this->customerAddressEagerLoad())
+            ->with(['maintenanceRequests' => function ($q): void {
+                $q->whereIn('status', ['new', 'assigned', 'in_progress'])
+                    ->with(['assignedTo:id,name'])
+                    ->latest('id')
+                    ->limit(1);
+            }])
             ->withCount(['maintenanceRequests as open_requests_count' => function (Builder $q): void {
                 $q->whereIn('status', ['new', 'assigned', 'in_progress']);
             }]);

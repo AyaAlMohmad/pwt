@@ -545,13 +545,12 @@ final class AdminMaintenanceService
             throw InvalidMaintenanceTransitionException::useCloseEndpoint();
         }
 
-        $note = isset($payload['note']) && is_string($payload['note']) ? $payload['note'] : null;
         $reason = isset($payload['reason']) && is_string($payload['reason']) ? $payload['reason'] : null;
 
         if ($target === MaintenanceStatus::Cancelled) {
             // Delegate to Phase 10 cancel() which handles
             // cancellation_reason, cancelled_by_user_id, closed_at.
-            $cancelled = $this->requests->cancel($request, $actor, (string) ($reason ?? $note ?? ''));
+            $cancelled = $this->requests->cancel($request, $actor, (string) ($reason ?? ''));
 
             $this->logActivity(
                 event: 'admin.maintenance.cancelled',
@@ -575,7 +574,7 @@ final class AdminMaintenanceService
             toStatus: $target,
             actor: $actor,
             actorType: MaintenanceActorType::Admin,
-            payload: ['note' => $note],
+            payload: ['note' => $reason],
         );
 
         $this->logActivity(
@@ -586,7 +585,7 @@ final class AdminMaintenanceService
             properties: [
                 'ip' => $ip,
                 'to_status' => $target->value,
-                'note' => $note,
+                'reason' => $reason,
             ],
         );
 
@@ -681,6 +680,58 @@ final class AdminMaintenanceService
         );
 
         return $this->find((int) $closed->id);
+    }
+
+    /**
+     * Find the latest open maintenance request for a machine.
+     * If none exists, auto-create one with default values.
+     *
+     * @return MaintenanceRequest A request in one of [new, assigned, in_progress].
+     */
+    public function findOrCreateOpenRequestForMachine(Machine $machine, User $actor): MaintenanceRequest
+    {
+        $openRequest = MaintenanceRequest::query()
+            ->where('machine_id', $machine->id)
+            ->whereIn('status', ['new', 'assigned', 'in_progress'])
+            ->latest('id')
+            ->first();
+
+        if ($openRequest !== null) {
+            return $openRequest;
+        }
+
+        return DB::transaction(function () use ($machine, $actor): MaintenanceRequest {
+            /** @var MaintenanceRequest $request */
+            $request = MaintenanceRequest::query()->create([
+                'public_id' => (string) Str::uuid(),
+                'user_id' => $machine->user_id,
+                'machine_id' => $machine->id,
+                'issue_type' => MaintenanceIssueType::FilterChange->value,
+                'description' => 'Auto-created from Machines page',
+                'status' => MaintenanceStatus::New->value,
+                'priority' => MaintenancePriority::Medium->value,
+            ]);
+
+            MaintenanceStatusHistory::query()->create([
+                'maintenance_request_id' => $request->id,
+                'from_status' => null,
+                'to_status' => MaintenanceStatus::New->value,
+                'actor_type' => MaintenanceActorType::Admin->value,
+                'actor_id' => $actor->getAuthIdentifier(),
+                'note' => null,
+            ]);
+
+            $requestId = (int) $request->id;
+            $userId = (int) $machine->user_id;
+            $machineId = (int) $machine->id;
+            $actorIdRaw = $actor->getAuthIdentifier();
+            $actorId = is_numeric($actorIdRaw) ? (int) $actorIdRaw : $userId;
+            DB::afterCommit(static function () use ($requestId, $userId, $machineId, $actorId): void {
+                event(new MaintenanceRequestCreated($requestId, $userId, $machineId, $actorId));
+            });
+
+            return $request;
+        });
     }
 
     /**

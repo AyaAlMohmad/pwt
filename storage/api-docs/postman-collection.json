@@ -1,0 +1,733 @@
+{
+    "info": {
+        "_postman_id": "pwt-admin-api-v1",
+        "name": "PWT Admin API v1",
+        "description": "Postman collection for the PWT Admin API. Set `base_url` and run `Admin Auth / Login` first; the response contains the token to paste into `admin_token`.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Admin Auth",
+            "item": [
+                {
+                    "name": "Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                             "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"super@pwt.local\",\n    \"password\": \"password\",\n    \"device_name\": \"Postman\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/auth/login",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "auth", "login"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/auth/logout",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "auth", "logout"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Me",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/me",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "me"]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Admin Machines",
+            "item": [
+                {
+                    "name": "List Machines",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/machines?page=1&per_page=15",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "machines"],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15"
+                                }
+                            ]
+                        }
+                    },
+                    "response": [
+                        {
+                            "name": "List 200",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{admin_token}}"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/machines?page=1&per_page=2",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "v1", "admin", "machines"],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1"
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "2"
+                                        }
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"Machines retrieved.\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"public_id\": \"uuid-1\",\n      \"display_name\": \"PW50M-2025-0001\",\n      \"serial_number\": \"BV1952100005\",\n      \"product\": {\n        \"id\": 1,\n        \"code\": \"PW50M-R-CT\",\n        \"name\": \"PW50M-R-CT\",\n        \"individual_buy_enabled\": true\n      },\n      \"customer\": {\n        \"id\": 5,\n        \"name\": \"Zara - Avenues Mall\",\n        \"email\": \"zara@example.com\",\n        \"phone\": \"+971501234567\"\n      },\n      \"plan\": \"buy\",\n      \"installed_at\": \"2025-03-17\",\n      \"next_maintenance_due_at\": \"2027-04-01\",\n      \"status\": \"ACTIVE\",\n      \"is_active\": true,\n      \"open_requests_count\": 0,\n      \"latest_open_maintenance_request\": null\n    },\n    {\n      \"id\": 2,\n      \"public_id\": \"uuid-2\",\n      \"display_name\": \"21R-B-2024-0002\",\n      \"serial_number\": \"212002JA00075\",\n      \"product\": {\n        \"id\": 2,\n        \"code\": \"21R-B\",\n        \"name\": \"21R-B Filtration Unit\",\n        \"individual_buy_enabled\": true\n      },\n      \"customer\": {\n        \"id\": 6,\n        \"name\": \"Azadea Main Office\",\n        \"email\": \"azadea@example.com\",\n        \"phone\": \"+971501234568\"\n      },\n      \"plan\": \"buy\",\n      \"installed_at\": \"2024-02-06\",\n      \"next_maintenance_due_at\": \"2027-03-05\",\n      \"status\": \"ACTIVE\",\n      \"is_active\": true,\n      \"open_requests_count\": 1,\n      \"latest_open_maintenance_request\": {\n        \"id\": 42,\n        \"public_id\": \"maint-uuid-42\",\n        \"status\": \"assigned\",\n        \"priority\": \"high\",\n        \"issue_type\": \"filter_change\",\n        \"created_at\": \"2026-10-05T10:00:00Z\"\n      }\n    }\n  ],\n  \"meta\": {\n    \"current_page\": 1,\n    \"per_page\": 2,\n    \"total\": 115\n  }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Show Machine",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/machines/{{machine_id}}",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "machines", "{{machine_id}}"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Due Maintenance",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/machines/due-maintenance?within_days=30",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "machines", "due-maintenance"],
+                            "query": [
+                                {
+                                    "key": "within_days",
+                                    "value": "30"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Machine",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"user_id\": 5,\n    \"product_id\": 1,\n    \"serial_number\": \"NEW-SERIAL-001\",\n    \"term\": \"buy\",\n    \"installed_at\": \"2025-01-15\",\n    \"country_code\": \"ae\",\n    \"filter_change_interval_months\": 6\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/machines",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "machines"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Machine",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"serial_number\": \"UPDATED-SERIAL-001\",\n    \"is_active\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/machines/{{machine_id}}",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "machines", "{{machine_id}}"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Maintenance Status (NEW)",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"status\": 3,\n    \"reason\": \"Technician dispatched from the Machines page\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/machines/{{machine_id}}/maintenance-status",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "machines", "{{machine_id}}", "maintenance-status"]
+                        }
+                    },
+                    "response": [
+                        {
+                            "name": "Transition 200",
+                            "originalRequest": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{admin_token}}"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": 3,\n    \"reason\": \"Technician dispatched\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/machines/2/maintenance-status",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "v1", "admin", "machines", "2", "maintenance-status"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"Maintenance request status updated.\",\n  \"data\": {\n    \"id\": 42,\n    \"public_id\": \"maint-uuid-42\",\n    \"status\": \"in_progress\",\n    \"priority\": \"high\",\n    \"issue_type\": \"filter_change\",\n    \"assigned_to\": {\n      \"id\": 7,\n      \"name\": \"Technician A\"\n    },\n    \"created_at\": \"2026-10-05T10:00:00Z\"\n  }\n}"
+                        },
+                        {
+                            "name": "No Open Request 404",
+                            "originalRequest": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{admin_token}}"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"in_progress\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/machines/1/maintenance-status",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "v1", "admin", "machines", "1", "maintenance-status"]
+                                }
+                            },
+                            "status": "Not Found",
+                            "code": 404,
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": false,\n  \"message\": \"This machine has no open maintenance request.\",\n  \"code\": \"ERR_NO_OPEN_MAINTENANCE_REQUEST\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Close Maintenance Request (Complete)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"resolution_notes\": \"Filter replaced successfully.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/machines/{{machine_id}}/maintenance-close",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "machines", "{{machine_id}}", "maintenance-close"]
+                        },
+                        "description": "Closes the latest in_progress maintenance request for this machine. Sets status=completed, writes resolution_notes, inserts a machine_maintenance_logs row, and recomputes next_maintenance_due_at."
+                    },
+                    "response": [
+                        {
+                            "name": "Close 200",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{admin_token}}"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"resolution_notes\": \"Filter replaced successfully.\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/machines/2/maintenance-close",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "v1", "admin", "machines", "2", "maintenance-close"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"Maintenance request closed.\",\n  \"data\": {\n    \"id\": 42,\n    \"public_id\": \"maint-uuid-42\",\n    \"status\": \"completed\",\n    \"priority\": \"high\",\n    \"issue_type\": \"filter_change\",\n    \"resolution_notes\": \"Filter replaced successfully.\",\n    \"assigned_to\": {\n      \"id\": 7,\n      \"name\": \"Technician A\"\n    },\n    \"created_at\": \"2026-10-05T10:00:00Z\"\n  }\n}"
+                        },
+                        {
+                            "name": "No In-Progress 404",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{admin_token}}"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"resolution_notes\": \"Should fail.\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/machines/1/maintenance-close",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "v1", "admin", "machines", "1", "maintenance-close"]
+                                }
+                            },
+                            "status": "Not Found",
+                            "code": 404,
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": false,\n  \"message\": \"This machine has no open maintenance request.\",\n  \"code\": \"ERR_NO_OPEN_MAINTENANCE_REQUEST\"\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Admin Maintenance Requests",
+            "item": [
+                {
+                    "name": "List Requests",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/maintenance-requests?status=new&page=1&per_page=15",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "maintenance-requests"],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "new"
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Show Request",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/maintenance-requests/{{maintenance_request_id}}",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "maintenance-requests", "{{maintenance_request_id}}"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Request (On Behalf)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"customer_id\": 5,\n    \"machine_id\": 2,\n    \"issue_type\": \"filter_change\",\n    \"description\": \"Filter needs urgent replacement.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/maintenance-requests",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "maintenance-requests"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Assign Technician",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"assigned_to_user_id\": 7,\n    \"reason\": \"Assigned to senior technician\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/maintenance-requests/{{maintenance_request_id}}/assign",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "maintenance-requests", "{{maintenance_request_id}}", "assign"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Status",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"status\": \"cancelled\",\n    \"reason\": \"Duplicate ticket\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/maintenance-requests/{{maintenance_request_id}}/status",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "maintenance-requests", "{{maintenance_request_id}}", "status"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Close Request",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"resolution_notes\": \"Filter replaced successfully.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/admin/maintenance-requests/{{maintenance_request_id}}/close",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "v1", "admin", "maintenance-requests", "{{maintenance_request_id}}", "close"]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://127.0.0.1:8000",
+            "type": "string"
+        },
+        {
+            "key": "admin_token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "machine_id",
+            "value": "2",
+            "type": "string"
+        },
+        {
+            "key": "maintenance_request_id",
+            "value": "42",
+            "type": "string"
+        }
+    ]
+}

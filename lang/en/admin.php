@@ -73,6 +73,7 @@ return [
         'owner_change_requires_address' => 'Reassigning the machine to another customer requires an address_id owned by the new customer.',
         'trashed_forbidden' => 'You are not authorised to view trashed machines.',
         'forbidden_field' => 'This field is server-managed and may not be supplied here.',
+        'no_open_maintenance_request' => 'This machine has no open maintenance request.',
     ],
 
     // Maintenance (Phase 18)

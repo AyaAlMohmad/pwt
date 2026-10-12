@@ -6,6 +6,7 @@ namespace App\Http\Resources\Api\V1\Admin\Machines;
 
 use App\Models\Address;
 use App\Models\Machine;
+use App\Models\MaintenanceRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -62,6 +63,7 @@ class AdminMachineResource extends JsonResource
             'order_id' => $machine->order_id,
             'needs_maintenance' => $needsMaintenance,
             'open_requests_count' => $this->resolveOpenRequestsCount($machine),
+            'latest_open_maintenance_request' => $this->resolveLatestOpenRequest($machine),
             'is_trashed' => $machine->trashed(),
             'created_at' => $machine->created_at->toIso8601String(),
         ];
@@ -182,5 +184,35 @@ class AdminMachineResource extends JsonResource
         $value = $machine->getAttribute('open_requests_count');
 
         return is_numeric($value) ? (int) $value : 0;
+    }
+
+    /**
+     * The most-recent open maintenance request for this machine,
+     * surfaced so the UI can show a status dropdown on the Machines
+     * list without an extra round-trip.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function resolveLatestOpenRequest(Machine $machine): ?array
+    {
+        if (! $machine->relationLoaded('maintenanceRequests')) {
+            return null;
+        }
+
+        $openRequest = $machine->maintenanceRequests
+            ->first(static fn (MaintenanceRequest $r): bool => in_array($r->status->value, ['new', 'assigned', 'in_progress'], true));
+
+        if ($openRequest === null) {
+            return null;
+        }
+
+        return [
+            'id' => $openRequest->id,
+            'public_id' => $openRequest->public_id,
+            'status' => $openRequest->status->value,
+            'priority' => $openRequest->priority->value,
+            'issue_type' => $openRequest->issue_type->value,
+            'created_at' => $openRequest->created_at->toIso8601String(),
+        ];
     }
 }
