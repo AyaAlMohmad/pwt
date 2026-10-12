@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Admin\Machines;
 
+use App\Enums\MaintenanceIssueType;
 use App\Enums\MaintenanceStatus;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -53,6 +54,8 @@ final class UpdateMachineMaintenanceStatusRequest extends FormRequest
         return [
             'status' => ['required', 'string', 'in:in_progress,cancelled,assigned,completed,new'],
             'reason' => ['nullable', 'string', 'min:3', 'max:1000'],
+            'issue_type' => ['nullable', 'string', 'in:'.implode(',', MaintenanceIssueType::values())],
+            'description' => ['nullable', 'string', 'min:3', 'max:2000'],
         ];
     }
 }

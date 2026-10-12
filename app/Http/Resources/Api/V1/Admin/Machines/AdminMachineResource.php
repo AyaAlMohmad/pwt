@@ -64,6 +64,7 @@ class AdminMachineResource extends JsonResource
             'needs_maintenance' => $needsMaintenance,
             'open_requests_count' => $this->resolveOpenRequestsCount($machine),
             'latest_open_maintenance_request' => $this->resolveLatestOpenRequest($machine),
+            'latest_maintenance_request' => $this->resolveLatestMaintenanceRequest($machine),
             'is_trashed' => $machine->trashed(),
             'created_at' => $machine->created_at->toIso8601String(),
         ];
@@ -213,6 +214,41 @@ class AdminMachineResource extends JsonResource
             'priority' => $openRequest->priority->value,
             'issue_type' => $openRequest->issue_type->value,
             'created_at' => $openRequest->created_at->toIso8601String(),
+        ];
+    }
+
+    /**
+     * The latest maintenance request for this machine.
+     * Prefers an open request (new/assigned/in_progress) so the UI
+     * sees the live state first. Falls back to the most-recent terminal
+     * request (completed/cancelled) when nothing is open so the page
+     * still shows the last activity.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function resolveLatestMaintenanceRequest(Machine $machine): ?array
+    {
+        if (! $machine->relationLoaded('maintenanceRequests')) {
+            return null;
+        }
+
+        $openRequest = $machine->maintenanceRequests
+            ->first(static fn (MaintenanceRequest $r): bool => in_array($r->status->value, ['new', 'assigned', 'in_progress'], true));
+
+        $latest = $openRequest ?? $machine->maintenanceRequests->first();
+
+        if ($latest === null) {
+            return null;
+        }
+
+        return [
+            'id' => $latest->id,
+            'public_id' => $latest->public_id,
+            'status' => $latest->status->value,
+            'priority' => $latest->priority->value,
+            'issue_type' => $latest->issue_type->value,
+            'created_at' => $latest->created_at->toIso8601String(),
+            'closed_at' => $latest->closed_at?->toIso8601String(),
         ];
     }
 }

@@ -684,11 +684,13 @@ final class AdminMaintenanceService
 
     /**
      * Find the latest open maintenance request for a machine.
-     * If none exists, auto-create one with default values.
+     * If none exists, auto-create one with the supplied issue_type
+     * and description (or sensible defaults).
      *
+     * @param  array<string, mixed>  $payload
      * @return MaintenanceRequest A request in one of [new, assigned, in_progress].
      */
-    public function findOrCreateOpenRequestForMachine(Machine $machine, User $actor): MaintenanceRequest
+    public function findOrCreateOpenRequestForMachine(Machine $machine, User $actor, array $payload = []): MaintenanceRequest
     {
         $openRequest = MaintenanceRequest::query()
             ->where('machine_id', $machine->id)
@@ -700,14 +702,23 @@ final class AdminMaintenanceService
             return $openRequest;
         }
 
-        return DB::transaction(function () use ($machine, $actor): MaintenanceRequest {
+        $issueTypeRaw = $payload['issue_type'] ?? null;
+        $issueType = is_string($issueTypeRaw) && $issueTypeRaw !== ''
+            ? MaintenanceIssueType::from(strtolower($issueTypeRaw))
+            : MaintenanceIssueType::FilterChange;
+
+        $description = isset($payload['description']) && is_string($payload['description']) && $payload['description'] !== ''
+            ? $payload['description']
+            : 'Auto-created from Machines page';
+
+        return DB::transaction(function () use ($machine, $actor, $issueType, $description): MaintenanceRequest {
             /** @var MaintenanceRequest $request */
             $request = MaintenanceRequest::query()->create([
                 'public_id' => (string) Str::uuid(),
                 'user_id' => $machine->user_id,
                 'machine_id' => $machine->id,
-                'issue_type' => MaintenanceIssueType::FilterChange->value,
-                'description' => 'Auto-created from Machines page',
+                'issue_type' => $issueType->value,
+                'description' => $description,
                 'status' => MaintenanceStatus::New->value,
                 'priority' => MaintenancePriority::Medium->value,
             ]);

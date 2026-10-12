@@ -298,7 +298,7 @@ final class AdminMachinesController extends Controller
         $actor = $request->user();
         $payload = $request->validated();
 
-        $openRequest = $this->maintenanceService->findOrCreateOpenRequestForMachine($machine, $actor);
+        $openRequest = $this->maintenanceService->findOrCreateOpenRequestForMachine($machine, $actor, $payload);
 
         $this->authorize('updateStatusAdmin', $openRequest);
 
@@ -347,7 +347,7 @@ final class AdminMachinesController extends Controller
         $actor = $request->user();
         $payload = $request->validated();
 
-        $openRequest = $this->maintenanceService->findOrCreateOpenRequestForMachine($machine, $actor);
+        $openRequest = $this->maintenanceService->findOrCreateOpenRequestForMachine($machine, $actor, $payload);
 
         // Close requires in_progress status. Auto-transition if needed.
         if ($openRequest->status !== MaintenanceStatus::InProgress) {

@@ -85,11 +85,36 @@ describe('PATCH /api/v1/admin/machines/{id}/maintenance-status', function (): vo
                 'reason' => 'Technician dispatched',
             ])
             ->assertOk()
-            ->assertJsonPath('data.status', MaintenanceStatus::InProgress->value);
+            ->assertJsonPath('data.status', MaintenanceStatus::InProgress->value)
+            ->assertJsonPath('data.issue_type', 'filter_change');
 
         $this->assertDatabaseHas('maintenance_requests', [
             'machine_id' => $machine->id,
             'status' => MaintenanceStatus::InProgress->value,
+        ]);
+    });
+
+    it('auto-creates with custom issue_type and description when none exists', function (): void {
+        [, $bearer] = machineStatusAdminBearer();
+        [, $machine] = machineStatusBuildSetup();
+
+        $this->withHeader('Authorization', $bearer)
+            ->patchJson("/api/v1/admin/machines/{$machine->id}/maintenance-status", [
+                'status' => MaintenanceStatus::InProgress->value,
+                'reason' => 'Technician dispatched',
+                'issue_type' => 'leak',
+                'description' => 'Water leaking from unit',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::InProgress->value)
+            ->assertJsonPath('data.issue_type', 'leak')
+            ->assertJsonPath('data.description', 'Water leaking from unit');
+
+        $this->assertDatabaseHas('maintenance_requests', [
+            'machine_id' => $machine->id,
+            'status' => MaintenanceStatus::InProgress->value,
+            'issue_type' => 'leak',
+            'description' => 'Water leaking from unit',
         ]);
     });
 

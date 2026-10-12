@@ -308,7 +308,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"status\": 3,\n    \"reason\": \"Technician dispatched from the Machines page\"\n}"
+                            "raw": "{\n    \"status\": 3,\n    \"reason\": \"Technician dispatched from the Machines page\",\n    \"issue_type\": \"filter_change\",\n    \"description\": \"Filter needs replacement\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/api/v1/admin/machines/{{machine_id}}/maintenance-status",
@@ -337,7 +337,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"status\": 3,\n    \"reason\": \"Technician dispatched\"\n}"
+                                    "raw": "{\n    \"status\": 3,\n    \"reason\": \"Technician dispatched\",\n    \"issue_type\": \"filter_change\",\n    \"description\": \"Filter needs replacement\"\n}"
                                 },
                                 "url": {
                                     "raw": "{{base_url}}/api/v1/admin/machines/2/maintenance-status",

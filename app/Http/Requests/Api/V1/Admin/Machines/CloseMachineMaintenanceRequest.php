@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Admin\Machines;
 
+use App\Enums\MaintenanceIssueType;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -27,6 +28,8 @@ final class CloseMachineMaintenanceRequest extends FormRequest
         return [
             'resolution_notes' => ['nullable', 'string', 'min:5', 'max:2000'],
             'completed_at' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'issue_type' => ['nullable', 'string', 'in:'.implode(',', MaintenanceIssueType::values())],
+            'description' => ['nullable', 'string', 'min:3', 'max:2000'],
 
             // Server-managed — reject explicit attempts.
             'status' => ['prohibited'],
