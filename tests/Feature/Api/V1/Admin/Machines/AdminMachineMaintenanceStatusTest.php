@@ -118,6 +118,37 @@ describe('PATCH /api/v1/admin/machines/{id}/maintenance-status', function (): vo
         ]);
     });
 
+    it('updates issue_type and description on an existing request', function (): void {
+        [, $bearer] = machineStatusAdminBearer();
+        [, $machine] = machineStatusBuildSetup();
+
+        $request = MaintenanceRequest::factory()->forUser($machine->user)->forMachine($machine)
+            ->state([
+                'status' => MaintenanceStatus::New->value,
+                'issue_type' => 'filter_change',
+                'description' => 'Original description',
+            ])
+            ->create();
+
+        $this->withHeader('Authorization', $bearer)
+            ->patchJson("/api/v1/admin/machines/{$machine->id}/maintenance-status", [
+                'status' => MaintenanceStatus::InProgress->value,
+                'reason' => 'Technician dispatched',
+                'issue_type' => 'leak',
+                'description' => 'Water leaking from unit',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', MaintenanceStatus::InProgress->value)
+            ->assertJsonPath('data.issue_type', 'leak')
+            ->assertJsonPath('data.description', 'Water leaking from unit');
+
+        $this->assertDatabaseHas('maintenance_requests', [
+            'id' => $request->id,
+            'issue_type' => 'leak',
+            'description' => 'Water leaking from unit',
+        ]);
+    });
+
     it('accepts a numeric status code (3 = in_progress)', function (): void {
         [, $bearer] = machineStatusAdminBearer();
         [, $machine] = machineStatusBuildSetup();

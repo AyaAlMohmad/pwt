@@ -746,6 +746,38 @@ final class AdminMaintenanceService
     }
 
     /**
+     * Update the mutable details (issue_type, description) on an existing
+     * request when the frontend sends them via the machine-level
+     * endpoints. This is useful when a request already exists but
+     * the user wants to change the problem description before
+     * transitioning or closing.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function updateRequestDetails(MaintenanceRequest $request, array $payload): void
+    {
+        $changed = false;
+
+        if (isset($payload['issue_type']) && is_string($payload['issue_type']) && $payload['issue_type'] !== '') {
+            try {
+                $request->issue_type = MaintenanceIssueType::from(strtolower($payload['issue_type']))->value;
+                $changed = true;
+            } catch (\ValueError) {
+                // ignore invalid issue_type
+            }
+        }
+
+        if (isset($payload['description']) && is_string($payload['description']) && $payload['description'] !== '') {
+            $request->description = $payload['description'];
+            $changed = true;
+        }
+
+        if ($changed) {
+            $request->save();
+        }
+    }
+
+    /**
      * @param  Builder<MaintenanceRequest>  $query
      * @param  array<string, mixed>  $filters
      */
