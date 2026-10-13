@@ -56,7 +56,6 @@ final class AdminMachineDetailResource extends AdminMachineResource
             ? $machine->maintenanceRequests->map(fn (MaintenanceRequest $req) => $this->resolveRequest($req))->values()->all()
             : [];
 
-        $base['latest_open_maintenance_request'] = $this->resolveLatestOpenRequest($machine);
         $base['latest_maintenance_request'] = $this->resolveLatestMaintenanceRequest($machine);
 
         $base['deleted_at'] = $machine->deleted_at?->toIso8601String();

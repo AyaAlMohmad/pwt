@@ -73,8 +73,7 @@ final class AdminMachineService
             ])
             ->with($this->customerAddressEagerLoad())
             ->with(['maintenanceRequests' => function ($q): void {
-                $q->whereIn('status', ['new', 'assigned', 'in_progress'])
-                    ->with(['assignedTo:id,name'])
+                $q->with(['assignedTo:id,name'])
                     ->latest('id')
                     ->limit(1);
             }])
@@ -110,8 +109,7 @@ final class AdminMachineService
             ])
             ->with($this->customerAddressEagerLoad())
             ->with(['maintenanceRequests' => function ($q): void {
-                $q->whereIn('status', ['new', 'assigned', 'in_progress'])
-                    ->with(['assignedTo:id,name'])
+                $q->with(['assignedTo:id,name'])
                     ->latest('id')
                     ->limit(1);
             }])

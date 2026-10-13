@@ -63,7 +63,6 @@ class AdminMachineResource extends JsonResource
             'order_id' => $machine->order_id,
             'needs_maintenance' => $needsMaintenance,
             'open_requests_count' => $this->resolveOpenRequestsCount($machine),
-            'latest_open_maintenance_request' => $this->resolveLatestOpenRequest($machine),
             'latest_maintenance_request' => $this->resolveLatestMaintenanceRequest($machine),
             'is_trashed' => $machine->trashed(),
             'created_at' => $machine->created_at->toIso8601String(),
@@ -188,41 +187,9 @@ class AdminMachineResource extends JsonResource
     }
 
     /**
-     * The most-recent open maintenance request for this machine,
-     * surfaced so the UI can show a status dropdown on the Machines
-     * list without an extra round-trip.
-     *
-     * @return array<string, mixed>|null
-     */
-    protected function resolveLatestOpenRequest(Machine $machine): ?array
-    {
-        if (! $machine->relationLoaded('maintenanceRequests')) {
-            return null;
-        }
-
-        $openRequest = $machine->maintenanceRequests
-            ->first(static fn (MaintenanceRequest $r): bool => in_array($r->status->value, ['new', 'assigned', 'in_progress'], true));
-
-        if ($openRequest === null) {
-            return null;
-        }
-
-        return [
-            'id' => $openRequest->id,
-            'public_id' => $openRequest->public_id,
-            'status' => $openRequest->status->value,
-            'priority' => $openRequest->priority->value,
-            'issue_type' => $openRequest->issue_type->value,
-            'created_at' => $openRequest->created_at->toIso8601String(),
-        ];
-    }
-
-    /**
-     * The latest maintenance request for this machine.
-     * Prefers an open request (new/assigned/in_progress) so the UI
-     * sees the live state first. Falls back to the most-recent terminal
-     * request (completed/cancelled) when nothing is open so the page
-     * still shows the last activity.
+     * The latest maintenance request for this machine,
+     * regardless of status. Includes full description and terminal
+     * metadata so the Machines list shows the last activity.
      *
      * @return array<string, mixed>|null
      */
@@ -232,14 +199,13 @@ class AdminMachineResource extends JsonResource
             return null;
         }
 
-        $openRequest = $machine->maintenanceRequests
-            ->first(static fn (MaintenanceRequest $r): bool => in_array($r->status->value, ['new', 'assigned', 'in_progress'], true));
-
-        $latest = $openRequest ?? $machine->maintenanceRequests->first();
+        $latest = $machine->maintenanceRequests->first();
 
         if ($latest === null) {
             return null;
         }
+
+        $assignedTo = $latest->relationLoaded('assignedTo') ? $latest->assignedTo : null;
 
         return [
             'id' => $latest->id,
@@ -247,8 +213,14 @@ class AdminMachineResource extends JsonResource
             'status' => $latest->status->value,
             'priority' => $latest->priority->value,
             'issue_type' => $latest->issue_type->value,
+            'description' => $latest->description,
+            'assigned_to' => $assignedTo !== null
+                ? ['id' => $assignedTo->id, 'name' => $assignedTo->name]
+                : null,
             'created_at' => $latest->created_at->toIso8601String(),
             'closed_at' => $latest->closed_at?->toIso8601String(),
+            'resolution_notes' => $latest->resolution_notes,
+            'cancellation_reason' => $latest->cancellation_reason,
         ];
     }
 }

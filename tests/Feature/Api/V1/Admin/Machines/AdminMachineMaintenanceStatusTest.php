@@ -231,7 +231,7 @@ describe('PATCH /api/v1/admin/machines/{id}/maintenance-status', function (): vo
             ->assertJsonPath('code', 'ERR_UNAUTHENTICATED');
     });
 
-    it('includes latest_open_maintenance_request in the machine list payload', function (): void {
+    it('includes latest_maintenance_request in the machine list payload', function (): void {
         [, $bearer] = machineStatusAdminBearer();
         [, $machine] = machineStatusBuildSetup();
 
@@ -243,8 +243,8 @@ describe('PATCH /api/v1/admin/machines/{id}/maintenance-status', function (): vo
             ->getJson('/api/v1/admin/machines');
 
         $response->assertOk()
-            ->assertJsonPath('data.0.latest_open_maintenance_request.id', $request->id)
-            ->assertJsonPath('data.0.latest_open_maintenance_request.status', MaintenanceStatus::Assigned->value);
+            ->assertJsonPath('data.0.latest_maintenance_request.id', $request->id)
+            ->assertJsonPath('data.0.latest_maintenance_request.status', MaintenanceStatus::Assigned->value);
     });
 });
 
