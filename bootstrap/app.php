@@ -166,10 +166,27 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
+            $originalMessage = $e->getMessage() ?: '';
+            \Illuminate\Support\Facades\Log::warning('NotFoundHttpException debug', [
+                'url' => $request->url(),
+                'method' => $request->method(),
+                'message' => $originalMessage,
+            ]);
+
+            $debug = config('app.debug') === true;
+            $responseMessage = $debug && $originalMessage !== ''
+                ? $originalMessage
+                : __('messages.not_found');
+
+            $payload = $debug
+                ? ['debug_url' => $request->url(), 'debug_method' => $request->method(), 'debug_message' => $originalMessage]
+                : null;
+
             return ApiResponse::error(
-                __('messages.not_found'),
+                $responseMessage,
                 404,
-                code: 'ERR_NOT_FOUND',
+                $payload,
+                'ERR_NOT_FOUND',
             );
         });
 

@@ -8,7 +8,6 @@ use App\Enums\MachineSource;
 use App\Enums\MachineVoltage;
 use App\Enums\ProductTerm;
 use App\Models\Machine;
-use App\Rules\ActiveProduct;
 use App\Rules\AddressBelongsToUser;
 use App\Rules\IsCustomer;
 use Illuminate\Foundation\Http\FormRequest;
@@ -64,7 +63,7 @@ final class UpdateMachineRequest extends FormRequest
 
         return [
             'user_id' => ['sometimes', 'integer', 'exists:users,id', new IsCustomer],
-            'product_id' => ['sometimes', 'integer', 'exists:products,id', new ActiveProduct],
+            'product_id' => ['sometimes', 'integer', 'exists:products,id'],
             'serial_number' => [
                 'sometimes', 'string', 'max:80',
                 Rule::unique('machines', 'serial_number')->ignore($id),

@@ -113,6 +113,19 @@ final class NotificationTemplatesSeeder extends Seeder
                 'lead.source',
             ];
         }
+        if (str_starts_with($key, 'rental.')) {
+            return array_merge($base, [
+                'data.schedule_id',
+                'data.machine_id',
+                'data.machine_name',
+                'data.user_name',
+                'data.user_email',
+                'data.due_date',
+                'data.amount',
+                'data.currency',
+                'data.reason',
+            ]);
+        }
 
         return $base;
     }

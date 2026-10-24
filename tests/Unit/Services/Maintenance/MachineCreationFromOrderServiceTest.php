@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\MachineRentalSchedule;
 use App\Services\Maintenance\MachineCreationFromOrderService;
 use Database\Seeders\CountriesAndRegionsSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -31,7 +32,7 @@ beforeEach(function (): void {
     $this->seed(RolesAndPermissionsSeeder::class);
     $this->seed(CountriesAndRegionsSeeder::class);
 
-    $this->service = new MachineCreationFromOrderService;
+    $this->service = app(MachineCreationFromOrderService::class);
     $this->uae = Country::query()->where('code', 'ae')->firstOrFail();
 });
 
@@ -163,5 +164,42 @@ describe('MachineCreationFromOrderService::createFromOrder()', function (): void
 
         expect($created)->toHaveCount(1);
         expect($created[0]->product_id)->toBe($eligible->id);
+    });
+
+    it('creates a rental schedule when the item term is rent', function (): void {
+        $product = Product::factory()->create(['is_machine_eligible' => true]);
+        ['order' => $order] = machineCreationOrder([
+            ['product' => $product, 'quantity' => 1],
+        ]);
+
+        // Overwrite the buy item with a rent item so the order has only rent.
+        $order->items()->delete();
+        OrderItem::factory()
+            ->forOrder($order)
+            ->forProduct($product)
+            ->state([
+                'term' => ProductTerm::Rent->value,
+                'unit_price' => '150.00',
+                'currency' => 'AED',
+                'rent_period' => 'monthly',
+                'quantity' => 1,
+            ])
+            ->create();
+
+        $order->load('items');
+
+        $created = $this->service->createFromOrder($order);
+
+        expect($created)->toHaveCount(1);
+
+        $schedule = MachineRentalSchedule::query()
+            ->where('machine_id', $created[0]->id)
+            ->first();
+
+        expect($schedule)->not->toBeNull();
+        expect($schedule->amount)->toBe('150.00');
+        expect($schedule->currency)->toBe('AED');
+        expect($schedule->frequency)->toBe('monthly');
+        expect($schedule->status->value)->toBe('active');
     });
 });

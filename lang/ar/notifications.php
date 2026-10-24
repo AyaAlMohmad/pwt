@@ -141,5 +141,31 @@ return [
                 'body' => 'تم إرسال رمز إعادة تعيين كلمة المرور إلى هاتفك.',
             ],
         ],
+        'rental' => [
+            'payment_due' => [
+                'subject' => 'Upcoming rental payment reminder',
+                'body' => 'Dear {{data.user_name}}, your next rental payment for machine {{data.machine_name}} is due on {{data.due_date}}. Please ensure your saved card has sufficient balance for the automatic deduction.',
+            ],
+            'payment_captured' => [
+                'subject' => 'Rental payment successful',
+                'body' => 'Dear {{data.user_name}}, your automatic rental payment of {{data.currency}} {{data.amount}} for machine {{data.machine_name}} was successful.',
+            ],
+            'payment_failed' => [
+                'subject' => 'Rental payment failed',
+                'body' => 'Dear {{data.user_name}}, your automatic rental payment of {{data.currency}} {{data.amount}} for machine {{data.machine_name}} could not be processed. Reason: {{data.reason}}. Please update your payment method.',
+            ],
+            'payment_due_admin' => [
+                'subject' => 'Rental payment approaching',
+                'body' => 'The rented machine {{data.machine_name}} for customer {{data.user_name}} ({{data.user_email}}) has a payment due on {{data.due_date}}.',
+            ],
+            'payment_captured_admin' => [
+                'subject' => 'Rental payment successful',
+                'body' => 'Automatic rental payment of {{data.currency}} {{data.amount}} for machine {{data.machine_name}} (customer: {{data.user_name}} / {{data.user_email}}) was successful.',
+            ],
+            'payment_failed_admin' => [
+                'subject' => 'Rental payment failed',
+                'body' => 'Automatic rental payment of {{data.currency}} {{data.amount}} for machine {{data.machine_name}} (customer: {{data.user_name}} / {{data.user_email}}) failed. Reason: {{data.reason}}.',
+            ],
+        ],
     ],
 ];

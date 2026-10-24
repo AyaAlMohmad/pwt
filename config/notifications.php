@@ -85,6 +85,14 @@ return [
         // Phase 13 — guest contact form. Ops-only (no user_id, no
         // in_app fan-out). See docs/architecture/contact.md § 9.4.
         'contact.created_ops' => ['email'],
+
+        // Rentals
+        'rental.payment_due' => ['in_app', 'email'],
+        'rental.payment_captured' => ['in_app', 'email'],
+        'rental.payment_failed' => ['in_app', 'email'],
+        'rental.payment_due_admin' => ['in_app', 'email'],
+        'rental.payment_captured_admin' => ['in_app', 'email'],
+        'rental.payment_failed_admin' => ['in_app', 'email'],
     ],
 
     /*

@@ -24,6 +24,9 @@ use App\Events\Orders\OrderOutForDelivery;
 use App\Events\Orders\OrderScheduled;
 use App\Events\Payments\PaymentCaptured;
 use App\Events\Payments\PaymentFailed;
+use App\Events\Rentals\MachineRentalPaymentCaptured;
+use App\Events\Rentals\MachineRentalPaymentDue;
+use App\Events\Rentals\MachineRentalPaymentFailed;
 use App\Events\Support\SupportTicketAssigned;
 use App\Events\Support\SupportTicketCancelled;
 use App\Events\Support\SupportTicketClosed;
@@ -60,6 +63,11 @@ final class EventServiceProvider extends ServiceProvider
         // Payments
         PaymentCaptured::class => [NotificationListener::class],
         PaymentFailed::class => [NotificationListener::class],
+
+        // Rentals
+        MachineRentalPaymentDue::class => [NotificationListener::class],
+        MachineRentalPaymentCaptured::class => [NotificationListener::class],
+        MachineRentalPaymentFailed::class => [NotificationListener::class],
 
         // Maintenance
         MaintenanceRequestCreated::class => [NotificationListener::class],

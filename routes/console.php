@@ -54,3 +54,5 @@ Artisan::command('maintenance:generate-due-requests', function (): void {
 })->purpose('Create maintenance requests for machines due within 10 days.');
 
 Schedule::command('maintenance:generate-due-requests')->dailyAt('01:00');
+Schedule::command('rental:send-reminders')->dailyAt('06:00');
+Schedule::command('rental:process-payments')->dailyAt('08:00');

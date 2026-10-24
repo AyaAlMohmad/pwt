@@ -12,8 +12,12 @@ use App\Events\BaseDomainEvent;
 use App\Events\Contact\ContactLeadCreated;
 use App\Events\Orders\OrderCompleted;
 use App\Events\Payments\PaymentCaptured;
+use App\Events\Rentals\MachineRentalPaymentCaptured;
+use App\Events\Rentals\MachineRentalPaymentDue;
+use App\Events\Rentals\MachineRentalPaymentFailed;
 use App\Events\Rfq\RfqCreated;
 use App\Events\Support\SupportTicketAssigned;
+use App\Models\Machine;
 use App\Events\Support\SupportTicketCancelled;
 use App\Events\Support\SupportTicketCreated;
 use App\Events\Support\SupportTicketReplied;
@@ -101,6 +105,17 @@ final class NotificationListener
 
         // Standard customer-side fan-out via the dispatcher.
         $this->dispatcher->dispatchFor($event);
+
+        // Rental events — also notify admins via in-app + email.
+        if ($event instanceof MachineRentalPaymentDue) {
+            $this->notifyAdmins('rental.payment_due_admin', $event);
+        }
+        if ($event instanceof MachineRentalPaymentCaptured) {
+            $this->notifyAdmins('rental.payment_captured_admin', $event);
+        }
+        if ($event instanceof MachineRentalPaymentFailed) {
+            $this->notifyAdmins('rental.payment_failed_admin', $event);
+        }
 
         // Phase 12 — support events ALSO notify the ops inbox via a
         // direct mail send (the persisted-Notification pipeline is
@@ -473,6 +488,45 @@ final class NotificationListener
                 'to' => $targetEmail,
                 'error' => $e->getMessage(),
                 'class' => get_class($e),
+            ]);
+        }
+    }
+
+    /**
+     * Dispatch an in-app + email notification to every admin user.
+     *
+     * Admin roles: super_admin, operations, sales, support.
+     * Failures are logged and swallowed so admin noise never blocks
+     * the customer-side path.
+     */
+    private function notifyAdmins(string $templateKey, BaseDomainEvent $event): void
+    {
+        try {
+            $payload = $event->payload();
+
+            /** @var list<User> $admins */
+            $admins = User::query()
+                ->whereHas('roles', static function ($q): void {
+                    $q->whereIn('name', ['super_admin', 'operations', 'sales', 'support']);
+                })
+                ->where('is_active', true)
+                ->get();
+
+            if ($admins->isEmpty()) {
+                return;
+            }
+
+            foreach ($admins as $admin) {
+                $this->dispatcher->dispatch(
+                    type: $templateKey,
+                    recipient: $admin,
+                    data: $payload,
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('notifications.admin.dispatch_failed', [
+                'template' => $templateKey,
+                'exception' => $e->getMessage(),
             ]);
         }
     }

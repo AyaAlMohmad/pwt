@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Services\Maintenance;
 
 use App\Enums\MachineSource;
+use App\Enums\ProductTerm;
 use App\Models\Address;
 use App\Models\Machine;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\Rentals\MachineRentalPaymentService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 // Phase 18 will inject MaintenanceScheduler here to set
@@ -28,6 +31,10 @@ use Illuminate\Support\Str;
  */
 final class MachineCreationFromOrderService
 {
+    public function __construct(
+        private readonly MachineRentalPaymentService $rentalService,
+    ) {}
+
     /**
      * @return list<Machine>
      */
@@ -98,6 +105,16 @@ final class MachineCreationFromOrderService
                         'order_id' => $order->id,
                         'order_installation_id' => $orderInstallationId,
                     ]);
+
+                    if ($item->term === ProductTerm::Rent) {
+                        $schedule = $this->rentalService->createScheduleFromMachine($machine, $item);
+                        if ($schedule !== null) {
+                            Log::info('rental.schedule_created_from_order', [
+                                'machine_id' => $machine->id,
+                                'schedule_id' => $schedule->id,
+                            ]);
+                        }
+                    }
 
                     $created[] = $machine;
                 }
