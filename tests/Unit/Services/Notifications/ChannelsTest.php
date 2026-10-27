@@ -6,6 +6,7 @@ use App\Enums\NotificationChannel as NotificationChannelEnum;
 use App\Mail\GenericNotificationMail;
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\UserDeviceToken;
 use App\Services\Notifications\Channels\Drivers\EmailChannel;
 use App\Services\Notifications\Channels\Drivers\InAppChannel;
 use App\Services\Notifications\Channels\Drivers\PushChannel;
@@ -162,7 +163,7 @@ describe('WhatsAppChannel', function (): void {
 });
 
 describe('PushChannel', function (): void {
-    it('returns true and logs the stub dispatch', function (): void {
+    it('returns true when the user has no active device tokens', function (): void {
         Log::spy();
         $user = User::factory()->customer()->create();
         $notification = Notification::factory()->state(['user_id' => $user->id])->create();
@@ -172,7 +173,30 @@ describe('PushChannel', function (): void {
         expect($channel->send($notification))->toBeTrue();
         Log::shouldHaveReceived('info')
             ->withArgs(function (string $message, array $context): bool {
-                return $message === 'notifications.push.stub_send';
+                return $message === 'notifications.push.no_tokens';
+            });
+    });
+
+    it('returns false when Firebase credentials are missing', function (): void {
+        Log::spy();
+        $user = User::factory()->customer()->create();
+        $notification = Notification::factory()->state(['user_id' => $user->id])->create();
+
+        UserDeviceToken::create([
+            'user_id' => $user->id,
+            'device_token' => 'fake_token',
+            'platform' => 'android',
+            'is_active' => true,
+        ]);
+
+        config()->set('services.fcm.credentials', '');
+
+        $channel = new PushChannel;
+
+        expect($channel->send($notification))->toBeFalse();
+        Log::shouldHaveReceived('warning')
+            ->withArgs(function (string $message, array $context): bool {
+                return $message === 'notifications.push.missing_credentials';
             });
     });
 });

@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'fcm' => [
+        // Legacy FCM server key (deprecated by Google, removed July 2024).
+        // Use FIREBASE_CREDENTIALS + FIREBASE_PROJECT_ID for FCM HTTP v1.
+        'server_key' => env('FCM_SERVER_KEY'),
+        'credentials' => env('FIREBASE_CREDENTIALS', 'storage/firebase-service-account.json'),
+        'project_id' => env('FIREBASE_PROJECT_ID', 'pwt-firebase'),
+    ],
+
 ];
