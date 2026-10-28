@@ -41,14 +41,18 @@ final class GenericNotificationMail extends Mailable implements ShouldQueue
     public function content(): Content
     {
         $locale = app()->getLocale();
+        $title = (string) $this->notification->getTranslation('title', $locale);
         $body = (string) $this->notification->getTranslation('body', $locale);
 
-        $html = '<p>'.e($body).'</p>';
-        if ($this->notification->action_url !== null && $this->notification->action_url !== '') {
-            $html .= '<p><a href="'.e($this->notification->action_url).'">'.e(__('notifications.cta')).'</a></p>';
-        }
-
-        return new Content(htmlString: $html);
+        return new Content(
+            view: 'emails.notification',
+            with: [
+                'title' => $title,
+                'body' => $body,
+                'actionUrl' => $this->notification->action_url,
+                'actionText' => __('notifications.cta'),
+            ],
+        );
     }
 
     /**

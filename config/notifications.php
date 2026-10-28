@@ -86,13 +86,13 @@ return [
         // in_app fan-out). See docs/architecture/contact.md § 9.4.
         'contact.created_ops' => ['email'],
 
-        // Rentals
-        'rental.payment_due' => ['in_app', 'email'],
-        'rental.payment_captured' => ['in_app', 'email'],
-        'rental.payment_failed' => ['in_app', 'email'],
-        'rental.payment_due_admin' => ['in_app', 'email'],
-        'rental.payment_captured_admin' => ['in_app', 'email'],
-        'rental.payment_failed_admin' => ['in_app', 'email'],
+        // Rentals (push = FCM mobile push)
+        'rental.payment_due' => ['in_app', 'email', 'push'],
+        'rental.payment_captured' => ['in_app', 'email', 'push'],
+        'rental.payment_failed' => ['in_app', 'email', 'push'],
+        'rental.payment_due_admin' => ['in_app', 'email', 'push'],
+        'rental.payment_captured_admin' => ['in_app', 'email', 'push'],
+        'rental.payment_failed_admin' => ['in_app', 'email', 'push'],
     ],
 
     /*

@@ -226,6 +226,125 @@ final class MachineRentalPaymentService
         }
     }
 
+    /**
+     * Customer-initiated retry for a failed (or skipped) rental payment.
+     *
+     * Accepts an optional different saved card. Returns a structured
+     * result so the controller can map to HTTP 200 / 202 / 400.
+     *
+     * @return array<string, mixed>
+     */
+    public function retryPayment(
+        MachineRentalSchedule $schedule,
+        ?PaymentCard $overrideCard = null,
+    ): array {
+        $paymentCard = $overrideCard ?? $schedule->paymentCard;
+
+        if ($paymentCard === null || $paymentCard->stripe_payment_method_id === null || $paymentCard->stripe_payment_method_id === '') {
+            return [
+                'status' => 'failed',
+                'reason' => 'No saved payment card on file.',
+                'customer_message' => $this->customerReasonFor('No saved payment card on file.'),
+            ];
+        }
+
+        $user = $schedule->user;
+        if ($user === null || $user->stripe_customer_id === null || $user->stripe_customer_id === '') {
+            return [
+                'status' => 'failed',
+                'reason' => 'Customer has no Stripe customer ID.',
+                'customer_message' => $this->customerReasonFor('Customer has no Stripe customer ID.'),
+            ];
+        }
+
+        $payment = MachineRentalPayment::query()->create([
+            'machine_rental_schedule_id' => $schedule->id,
+            'machine_id' => $schedule->machine_id,
+            'user_id' => $schedule->user_id,
+            'payment_card_id' => $paymentCard->id,
+            'amount' => $schedule->amount,
+            'currency' => $schedule->currency,
+            'status' => MachineRentalPaymentStatus::Pending->value,
+            'due_date' => $schedule->next_payment_due_at->toDateString(),
+            'paid_at' => null,
+            'stripe_payment_intent_id' => null,
+            'failure_reason' => null,
+        ]);
+
+        try {
+            $this->configureStripe();
+
+            $amountCents = $this->toCents($schedule->amount, $schedule->currency);
+            $currency = strtolower($schedule->currency);
+
+            /** @var PaymentIntent $intent */
+            $intent = PaymentIntent::create([
+                'amount' => $amountCents,
+                'currency' => $currency,
+                'customer' => $user->stripe_customer_id,
+                'payment_method' => $paymentCard->stripe_payment_method_id,
+                'off_session' => false, // on-session retry — customer is present
+                'confirm' => true,
+                'metadata' => [
+                    'machine_rental_schedule_id' => $schedule->id,
+                    'machine_rental_payment_id' => $payment->id,
+                    'machine_id' => $schedule->machine_id,
+                    'user_id' => $schedule->user_id,
+                    'source' => 'customer_retry',
+                ],
+            ]);
+
+            if ($intent->status === 'succeeded') {
+                $this->recordSuccess($schedule, $payment, $intent->id);
+
+                return [
+                    'status' => 'succeeded',
+                    'payment_id' => $payment->id,
+                    'amount' => $schedule->amount,
+                    'currency' => $schedule->currency,
+                    'next_due_date' => $schedule->fresh()->next_payment_due_at->toDateString(),
+                ];
+            }
+
+            if ($intent->status === 'requires_action') {
+                return [
+                    'status' => 'requires_action',
+                    'client_secret' => $intent->client_secret,
+                    'payment_intent_id' => $intent->id,
+                ];
+            }
+
+            $this->recordFailure($schedule, $payment, 'Payment intent status: ' . $intent->status);
+
+            return [
+                'status' => 'failed',
+                'reason' => 'Payment intent status: ' . $intent->status,
+                'customer_message' => $this->customerReasonFor('Payment intent status: ' . $intent->status),
+            ];
+        } catch (\Stripe\Exception\CardException $e) {
+            $this->recordFailure($schedule, $payment, $e->getMessage());
+
+            return [
+                'status' => 'failed',
+                'reason' => $e->getMessage(),
+                'customer_message' => $this->customerReasonFor($e->getMessage()),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('rental.retry_payment_exception', [
+                'schedule_id' => $schedule->id,
+                'payment_id' => $payment->id,
+                'exception' => $e->getMessage(),
+            ]);
+            $this->recordFailure($schedule, $payment, 'Unexpected error: ' . $e->getMessage());
+
+            return [
+                'status' => 'failed',
+                'reason' => 'Unexpected error: ' . $e->getMessage(),
+                'customer_message' => $this->customerReasonFor('Unexpected error: ' . $e->getMessage()),
+            ];
+        }
+    }
+
     // ------------------------------------------------------------------
     // Internals
     // ------------------------------------------------------------------
@@ -234,15 +353,16 @@ final class MachineRentalPaymentService
     {
         $user = $schedule->user;
         $machine = $schedule->machine;
+        $machineName = $machine instanceof \App\Models\Machine ? $machine->displayName() : (string) $schedule->machine_id;
 
         event(new \App\Events\Rentals\MachineRentalPaymentDue(
             scheduleId: $schedule->id,
             machineId: $schedule->machine_id,
             userId: $schedule->user_id,
             dueDate: $schedule->next_payment_due_at->toDateString(),
-            userName: $user?->name ?? '',
-            userEmail: $user?->email ?? '',
-            machineName: $machine instanceof \App\Models\Machine ? $machine->displayName() : (string) $schedule->machine_id,
+            customerName: $user?->name ?? '',
+            customerEmail: $user?->email ?? '',
+            machineName: $machineName,
         ));
     }
 
@@ -272,7 +392,7 @@ final class MachineRentalPaymentService
             ]);
         });
 
-        $context = $this->resolveEventContext($schedule);
+        $context = $this->resolveCustomerContext($schedule);
 
         event(new MachineRentalPaymentCaptured(
             paymentId: $payment->id,
@@ -281,8 +401,8 @@ final class MachineRentalPaymentService
             userId: $schedule->user_id,
             amount: $schedule->amount,
             currency: $schedule->currency,
-            userName: $context['userName'],
-            userEmail: $context['userEmail'],
+            customerName: $context['customerName'],
+            customerEmail: $context['customerEmail'],
             machineName: $context['machineName'],
         ));
 
@@ -309,7 +429,7 @@ final class MachineRentalPaymentService
             'failure_reason' => $reason,
         ]);
 
-        $context = $this->resolveEventContext($schedule);
+        $context = $this->resolveCustomerContext($schedule);
 
         event(new MachineRentalPaymentFailed(
             paymentId: $payment->id,
@@ -319,8 +439,9 @@ final class MachineRentalPaymentService
             amount: $schedule->amount,
             currency: $schedule->currency,
             reason: $reason,
-            userName: $context['userName'],
-            userEmail: $context['userEmail'],
+            customerReason: $this->customerReasonFor($reason),
+            customerName: $context['customerName'],
+            customerEmail: $context['customerEmail'],
             machineName: $context['machineName'],
         ));
 
@@ -341,7 +462,7 @@ final class MachineRentalPaymentService
             'failure_reason' => $reason,
         ]);
 
-        $context = $this->resolveEventContext($schedule);
+        $context = $this->resolveCustomerContext($schedule);
 
         event(new MachineRentalPaymentFailed(
             paymentId: $payment->id,
@@ -351,8 +472,9 @@ final class MachineRentalPaymentService
             amount: $schedule->amount,
             currency: $schedule->currency,
             reason: $reason,
-            userName: $context['userName'],
-            userEmail: $context['userEmail'],
+            customerReason: $this->customerReasonFor($reason),
+            customerName: $context['customerName'],
+            customerEmail: $context['customerEmail'],
             machineName: $context['machineName'],
         ));
 
@@ -418,21 +540,54 @@ final class MachineRentalPaymentService
     }
 
     /**
-     * Resolve user + machine display names for event payloads.
+     * Resolve customer name, email and machine display name for event payloads.
      *
-     * @return array{userName: string, userEmail: string, machineName: string}
+     * @return array{customerName: string, customerEmail: string, machineName: string}
      */
-    private function resolveEventContext(MachineRentalSchedule $schedule): array
+    private function resolveCustomerContext(MachineRentalSchedule $schedule): array
     {
         $user = $schedule->user;
         $machine = $schedule->machine;
 
         return [
-            'userName' => $user?->name ?? '',
-            'userEmail' => $user?->email ?? '',
+            'customerName' => $user?->name ?? '',
+            'customerEmail' => $user?->email ?? '',
             'machineName' => $machine instanceof \App\Models\Machine
                 ? $machine->displayName()
                 : (string) $schedule->machine_id,
         ];
+    }
+
+    /**
+     * Map an internal technical failure reason to a safe customer-facing
+     * short explanation. Aligns with the 7 failure cases in Phase 2 spec.
+     */
+    private function customerReasonFor(string $reason): string
+    {
+        if (str_contains($reason, 'No saved payment card')) {
+            return 'no payment card is saved on your account';
+        }
+
+        if (str_contains($reason, 'Stripe customer ID')) {
+            return 'an account processing issue occurred';
+        }
+
+        if (str_contains($reason, 'requires additional authentication')) {
+            return 'your bank requires additional verification';
+        }
+
+        if (str_contains($reason, 'requires_action')) {
+            return 'additional verification is required by your bank';
+        }
+
+        if (str_contains($reason, 'requires_payment_method')) {
+            return 'your saved card could not be charged';
+        }
+
+        if (str_contains($reason, 'Stripe\Exception\CardException') || str_contains($reason, 'card was declined') || str_contains($reason, 'insufficient funds') || str_contains($reason, 'expired') || str_contains($reason, 'CVC')) {
+            return 'your saved card could not be processed';
+        }
+
+        return 'a temporary technical issue occurred';
     }
 }

@@ -13,8 +13,8 @@ final class MachineRentalPaymentDue extends BaseDomainEvent
         public readonly int $machineId,
         public readonly int $userId,
         public readonly string $dueDate,
-        public readonly string $userName = '',
-        public readonly string $userEmail = '',
+        public readonly string $customerName = '',
+        public readonly string $customerEmail = '',
         public readonly string $machineName = '',
         ?int $actorUserId = null,
     ) {
@@ -36,8 +36,8 @@ final class MachineRentalPaymentDue extends BaseDomainEvent
             'machine_id' => $this->machineId,
             'user_id' => $this->userId,
             'due_date' => $this->dueDate,
-            'user_name' => $this->userName,
-            'user_email' => $this->userEmail,
+            'customer_name' => $this->customerName,
+            'customer_email' => $this->customerEmail,
             'machine_name' => $this->machineName,
         ];
     }

@@ -143,29 +143,37 @@ return [
         ],
         'rental' => [
             'payment_due' => [
-                'subject' => 'Upcoming rental payment reminder',
-                'body' => 'Dear {{data.user_name}}, your next rental payment for machine {{data.machine_name}} is due on {{data.due_date}}. Please ensure your saved card has sufficient balance for the automatic deduction.',
+                'subject' => 'Upcoming Rental Payment Reminder',
+                'body' => 'Your next rental payment for machine #{{data.machine_id}} ({{data.machine_name}}) is due on {{data.due_date}}. Please ensure your saved card has sufficient funds for the automatic deduction.',
             ],
             'payment_captured' => [
-                'subject' => 'Rental payment successful',
-                'body' => 'Dear {{data.user_name}}, your automatic rental payment of {{data.currency}} {{data.amount}} for machine {{data.machine_name}} was successful.',
+                'subject' => 'Rental Payment Successful',
+                'body' => 'Your automatic rental payment of {{data.currency}} {{data.amount}} for machine #{{data.machine_id}} ({{data.machine_name}}) was successful.',
             ],
             'payment_failed' => [
-                'subject' => 'Rental payment failed',
-                'body' => 'Dear {{data.user_name}}, your automatic rental payment of {{data.currency}} {{data.amount}} for machine {{data.machine_name}} could not be processed. Reason: {{data.reason}}. Please update your payment method.',
+                'subject' => 'Rental Payment Failed',
+                'body' => 'Your automatic rental payment of {{data.currency}} {{data.amount}} for machine #{{data.machine_id}} ({{data.machine_name}}) could not be processed. Reason: {{data.customer_reason}}. Please follow the payment instructions in PWT.',
             ],
             'payment_due_admin' => [
-                'subject' => 'Rental payment approaching',
-                'body' => 'The rented machine {{data.machine_name}} for customer {{data.user_name}} ({{data.user_email}}) has a payment due on {{data.due_date}}.',
+                'subject' => 'Upcoming Rental Payment',
+                'body' => 'The rented machine #{{data.machine_id}} ({{data.machine_name}}) for customer {{user.name}} has a payment due on {{data.due_date}}.',
             ],
             'payment_captured_admin' => [
-                'subject' => 'Rental payment successful',
-                'body' => 'Automatic rental payment of {{data.currency}} {{data.amount}} for machine {{data.machine_name}} (customer: {{data.user_name}} / {{data.user_email}}) was successful.',
+                'subject' => 'Rental Payment Successful',
+                'body' => 'Automatic rental payment of {{data.currency}} {{data.amount}} for machine #{{data.machine_id}} ({{data.machine_name}}) (customer: {{user.name}}) was successful.',
             ],
             'payment_failed_admin' => [
-                'subject' => 'Rental payment failed',
-                'body' => 'Automatic rental payment of {{data.currency}} {{data.amount}} for machine {{data.machine_name}} (customer: {{data.user_name}} / {{data.user_email}}) failed. Reason: {{data.reason}}.',
+                'subject' => 'Rental Payment Failed',
+                'body' => 'Automatic rental payment of {{data.currency}} {{data.amount}} for machine #{{data.machine_id}} ({{data.machine_name}}) (customer: {{user.name}}) failed. Reason: {{data.reason}}.',
             ],
         ],
+    ],
+
+    // Rental API responses
+    'rentals' => [
+        'schedule_not_found' => 'Rental schedule not found.',
+        'invalid_payment_card' => 'The selected payment card is invalid or does not belong to you.',
+        'payment_retry_succeeded' => 'Payment successful. Your next due date has been updated.',
+        'payment_requires_action' => 'Your bank requires additional verification. Please confirm the payment.',
     ],
 ];

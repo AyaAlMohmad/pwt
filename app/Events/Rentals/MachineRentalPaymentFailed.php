@@ -16,8 +16,9 @@ final class MachineRentalPaymentFailed extends BaseDomainEvent
         public readonly string $amount,
         public readonly string $currency,
         public readonly ?string $reason = null,
-        public readonly string $userName = '',
-        public readonly string $userEmail = '',
+        public readonly string $customerReason = '',
+        public readonly string $customerName = '',
+        public readonly string $customerEmail = '',
         public readonly string $machineName = '',
         ?int $actorUserId = null,
     ) {
@@ -42,8 +43,9 @@ final class MachineRentalPaymentFailed extends BaseDomainEvent
             'amount' => $this->amount,
             'currency' => $this->currency,
             'reason' => $this->reason,
-            'user_name' => $this->userName,
-            'user_email' => $this->userEmail,
+            'customer_reason' => $this->customerReason,
+            'customer_name' => $this->customerName,
+            'customer_email' => $this->customerEmail,
             'machine_name' => $this->machineName,
         ];
     }

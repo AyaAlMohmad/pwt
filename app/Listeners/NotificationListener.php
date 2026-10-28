@@ -24,6 +24,8 @@ use App\Events\Support\SupportTicketReplied;
 use App\Jobs\SendNotificationJob;
 use App\Mail\GenericOpsNotificationMail;
 use App\Models\ContactLead;
+use App\Enums\DeliveryStatus;
+use App\Models\Notification;
 use App\Models\NotificationTemplate;
 use App\Models\Order;
 use App\Models\Payment;
@@ -33,6 +35,7 @@ use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Notifications\TemplateRenderer;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 /**
  * Single fan-out listener for every {@see BaseDomainEvent}. The
@@ -496,6 +499,10 @@ final class NotificationListener
      * Dispatch an in-app + email notification to every admin user.
      *
      * Admin roles: super_admin, operations, sales, support.
+     * For admin rental notifications, {{user.name}} must resolve to the
+     * rental CUSTOMER name (per Phase 2 spec) so we build the context
+     * manually with the customer as the user key.
+     *
      * Failures are logged and swallowed so admin noise never blocks
      * the customer-side path.
      */
@@ -503,6 +510,12 @@ final class NotificationListener
     {
         try {
             $payload = $event->payload();
+            $userId = isset($payload['user_id']) && is_int($payload['user_id'])
+                ? $payload['user_id']
+                : null;
+
+            /** @var User|null $customer */
+            $customer = $userId !== null ? User::query()->find($userId) : null;
 
             /** @var list<User> $admins */
             $admins = User::query()
@@ -516,12 +529,45 @@ final class NotificationListener
                 return;
             }
 
-            foreach ($admins as $admin) {
-                $this->dispatcher->dispatch(
-                    type: $templateKey,
-                    recipient: $admin,
-                    data: $payload,
-                );
+            $channels = (array) config('notifications.channels_per_type.'.$templateKey, ['in_app', 'email']);
+
+            foreach ($channels as $channelValue) {
+                $template = NotificationTemplate::query()
+                    ->where('key', $templateKey)
+                    ->where('channel', (string) $channelValue)
+                    ->where('is_active', true)
+                    ->first();
+
+                if ($template === null) {
+                    continue;
+                }
+
+                $context = [
+                    'user' => [
+                        'id' => $customer?->id,
+                        'name' => $customer?->name ?? '',
+                        'email' => $customer?->email ?? '',
+                    ],
+                    'data' => $payload,
+                ];
+
+                $rendered = $this->renderer->renderBilingual($template, $context);
+
+                foreach ($admins as $admin) {
+                    $notification = Notification::query()->create([
+                        'public_id' => Str::uuid()->toString(),
+                        'user_id' => $admin->id,
+                        'type' => $templateKey,
+                        'title' => $rendered['title'],
+                        'body' => $rendered['body'],
+                        'data' => $this->safeScalars($payload),
+                        'channel' => (string) $channelValue,
+                        'delivery_status' => DeliveryStatus::Queued->value,
+                    ]);
+
+                    SendNotificationJob::dispatch($notification->id)
+                        ->onQueue((string) config('notifications.queue', 'notifications'));
+                }
             }
         } catch (\Throwable $e) {
             Log::warning('notifications.admin.dispatch_failed', [
@@ -529,5 +575,22 @@ final class NotificationListener
                 'exception' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Strip objects / models so the JSON column stays safe.
+     *
+     * @return array<string, mixed>
+     */
+    private function safeScalars(array $data): array
+    {
+        $clean = [];
+        foreach ($data as $k => $v) {
+            if (is_scalar($v) || $v === null || is_array($v)) {
+                $clean[$k] = is_array($v) ? $this->safeScalars($v) : $v;
+            }
+        }
+
+        return $clean;
     }
 }

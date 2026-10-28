@@ -15,8 +15,8 @@ final class MachineRentalPaymentCaptured extends BaseDomainEvent
         public readonly int $userId,
         public readonly string $amount,
         public readonly string $currency,
-        public readonly string $userName = '',
-        public readonly string $userEmail = '',
+        public readonly string $customerName = '',
+        public readonly string $customerEmail = '',
         public readonly string $machineName = '',
         ?int $actorUserId = null,
     ) {
@@ -40,8 +40,8 @@ final class MachineRentalPaymentCaptured extends BaseDomainEvent
             'user_id' => $this->userId,
             'amount' => $this->amount,
             'currency' => $this->currency,
-            'user_name' => $this->userName,
-            'user_email' => $this->userEmail,
+            'customer_name' => $this->customerName,
+            'customer_email' => $this->customerEmail,
             'machine_name' => $this->machineName,
         ];
     }

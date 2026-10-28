@@ -118,12 +118,13 @@ final class NotificationTemplatesSeeder extends Seeder
                 'data.schedule_id',
                 'data.machine_id',
                 'data.machine_name',
-                'data.user_name',
-                'data.user_email',
                 'data.due_date',
                 'data.amount',
                 'data.currency',
                 'data.reason',
+                'data.customer_reason',
+                'data.customer_name',
+                'data.customer_email',
             ]);
         }
 

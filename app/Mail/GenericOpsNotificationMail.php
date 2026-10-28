@@ -46,9 +46,15 @@ final class GenericOpsNotificationMail extends Mailable implements ShouldQueue
             return new Content(htmlString: $this->body);
         }
 
-        $html = '<p style="font-family: sans-serif; line-height: 1.5;">'.nl2br(e($this->body)).'</p>';
-
-        return new Content(htmlString: $html);
+        return new Content(
+            view: 'emails.notification',
+            with: [
+                'title' => $this->title,
+                'body' => $this->body,
+                'actionUrl' => null,
+                'actionText' => __('notifications.cta'),
+            ],
+        );
     }
 
     /**

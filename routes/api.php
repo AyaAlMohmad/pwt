@@ -153,6 +153,14 @@ Route::prefix('v1')->group(function (): void {
         ->whereUuid('uuid')
         ->name('files.download');
 
+    // Push token registration (FCM) for mobile push notifications.
+    Route::middleware('auth:sanctum')->prefix('push-tokens')->name('push-tokens.')->group(function (): void {
+        Route::post('/register', [\App\Http\Controllers\Api\V1\Notifications\PushTokenController::class, 'register'])
+            ->name('register');
+        Route::post('/unregister', [\App\Http\Controllers\Api\V1\Notifications\PushTokenController::class, 'unregister'])
+            ->name('unregister');
+    });
+
     // Public catalog (categories + products). Read-only, no auth.
     // Rate limited at 60/min/IP (`public` limiter — CLAUDE.md § 5.7).
     Route::middleware('throttle:public')->group(function (): void {
@@ -227,6 +235,16 @@ Route::prefix('v1')->group(function (): void {
         ->name('payments.webhook');
 
     // Phase 10 — Machines (customer-owned) + Maintenance Requests.
+    // Rental payments — manual retry after a failed automatic charge.
+    // {machine} is the machine_id so the mobile app does not need to
+    // know the internal schedule id.
+    Route::middleware('auth:sanctum')->prefix('rentals')->name('rentals.')->group(function (): void {
+        Route::post('/{machine}/retry-payment', [\App\Http\Controllers\Api\V1\Rentals\RentalPaymentsController::class, 'retry'])
+            ->whereNumber('machine')
+            ->middleware('throttle:payments.initiate')
+            ->name('retry-payment');
+    });
+
     // /me/machines is read-only here; admin create/edit lives in Phase 18.
     // POST /maintenance-requests carries a 10/min/user limiter
     // (`maintenance.create` named limiter in AppServiceProvider).
