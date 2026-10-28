@@ -86,7 +86,7 @@ final class PushChannel implements NotificationChannel
                 ->withHighestPossiblePriority();
 
             if ($tokenRow->platform === 'web') {
-                $webLink = $this->resolveWebLink($notification->action_url);
+                $webLink = $this->resolveWebLink($notification->action_url, $notification->type);
 
                 $message = $message->withWebPushConfig([
                     'notification' => [
@@ -127,11 +127,22 @@ final class PushChannel implements NotificationChannel
      * Build an absolute URL for the web-push click-through link.
      *
      * If the notification carries an action_url we use it (absolute or
-     * relative). Otherwise we fall back to the generic notifications
-     * deep-link so the web app can route the user itself.
+     * relative). Admin notifications fall back to the admin dashboard URL;
+     * customer notifications fall back to the generic notifications inbox.
      */
-    private function resolveWebLink(?string $actionUrl): string
+    private function resolveWebLink(?string $actionUrl, string $type): string
     {
+        if (str_ends_with($type, '_admin')) {
+            $base = rtrim(config('app.urlappadmin', ''), '/');
+            if ($actionUrl === null || $actionUrl === '') {
+                return $base;
+            }
+            if (str_starts_with($actionUrl, 'http')) {
+                return $actionUrl;
+            }
+            return $base.'/'.ltrim($actionUrl, '/');
+        }
+
         $base = rtrim(config('app.urlapp', ''), '/');
 
         if ($actionUrl === null || $actionUrl === '') {

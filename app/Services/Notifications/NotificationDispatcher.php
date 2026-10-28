@@ -256,7 +256,11 @@ final class NotificationDispatcher
      */
     private function resolveActionUrl(string $type, array $data): ?string
     {
-        // All notifications open the notifications inbox on tap.
+        if (str_ends_with($type, '_admin')) {
+            return rtrim((string) config('app.urlappadmin', ''), '/');
+        }
+
+        // Customer notifications open the notifications inbox on tap.
         return null;
     }
 
