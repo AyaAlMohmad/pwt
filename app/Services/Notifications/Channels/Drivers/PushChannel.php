@@ -86,9 +86,15 @@ final class PushChannel implements NotificationChannel
                 ->withHighestPossiblePriority();
 
             if ($tokenRow->platform === 'web') {
+                $webLink = $this->resolveWebLink($notification->action_url);
+
                 $message = $message->withWebPushConfig([
+                    'notification' => [
+                        'title' => $title,
+                        'body' => $body,
+                    ],
                     'fcm_options' => [
-                        'link' => $this->resolveWebLink($notification->action_url),
+                        'link' => $webLink,
                     ],
                 ]);
             }
