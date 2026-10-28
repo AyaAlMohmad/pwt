@@ -28,10 +28,10 @@ final class PushChannel implements NotificationChannel
         $tokens = UserDeviceToken::query()
             ->where('user_id', $notification->user_id)
             ->where('is_active', true)
-            ->pluck('device_token')
-            ->toArray();
+            ->select('device_token', 'platform')
+            ->get();
 
-        if ($tokens === []) {
+        if ($tokens->isEmpty()) {
             Log::info('notifications.push.no_tokens', [
                 'user_id' => $notification->user_id,
             ]);
@@ -76,12 +76,22 @@ final class PushChannel implements NotificationChannel
         }
 
         $okCount = 0;
-        foreach ($tokens as $token) {
+        foreach ($tokens as $tokenRow) {
+            $token = $tokenRow->device_token;
+
             $message = CloudMessage::new()
                 ->withToken($token)
                 ->withNotification(FcmNotification::create($title, $body))
                 ->withData($data)
                 ->withHighestPossiblePriority();
+
+            if ($tokenRow->platform === 'web') {
+                $message = $message->withWebPushConfig([
+                    'fcm_options' => [
+                        'link' => $this->resolveWebLink($notification->action_url),
+                    ],
+                ]);
+            }
 
             try {
                 $messaging->send($message);
@@ -105,6 +115,28 @@ final class PushChannel implements NotificationChannel
         }
 
         return $okCount > 0;
+    }
+
+    /**
+     * Build an absolute URL for the web-push click-through link.
+     *
+     * If the notification carries an action_url we use it (absolute or
+     * relative). Otherwise we fall back to the generic notifications
+     * deep-link so the web app can route the user itself.
+     */
+    private function resolveWebLink(?string $actionUrl): string
+    {
+        $base = rtrim(config('app.url', ''), '/');
+
+        if ($actionUrl === null || $actionUrl === '') {
+            return $base.'/#/notifications';
+        }
+
+        if (str_starts_with($actionUrl, 'http')) {
+            return $actionUrl;
+        }
+
+        return $base.'/'.ltrim($actionUrl, '/');
     }
 
     /**

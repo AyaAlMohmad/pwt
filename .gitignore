@@ -23,3 +23,21 @@ yarn-error.log
 /.vscode
 /.zed
 env.txt
+
+# Firebase service-account key (sensitive – do NOT commit)
+/storage/firebase-service-account.json
+
+# Temporary / local scripts
+/tmp_*.php
+/database/check_email_status.php
+/database/create_rental_test_data.php
+/database/create_rental_test_data.sql
+/database/delete_aya_user.php
+
+# Local spreadsheets
+/PWT_Phase2_Notifications_Updated.xlsx
+
+# Unrelated work-in-progress (keep white / out of git status)
+/app/Http/Controllers/Api/V1/Rentals/
+/app/Http/Requests/Api/V1/Rentals/
+/resources/views/emails/
