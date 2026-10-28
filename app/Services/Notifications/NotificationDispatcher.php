@@ -205,7 +205,7 @@ final class NotificationDispatcher
      */
     private function primaryBusinessId(array $data): ?int
     {
-        foreach (['order_id', 'maintenance_request_id', 'payment_id'] as $key) {
+        foreach (['order_id', 'maintenance_request_id', 'payment_id', 'machine_id', 'schedule_id'] as $key) {
             if (isset($data[$key]) && is_numeric($data[$key])) {
                 return (int) $data[$key];
             }
@@ -256,32 +256,7 @@ final class NotificationDispatcher
      */
     private function resolveActionUrl(string $type, array $data): ?string
     {
-        $base = rtrim((string) config('app.url', ''), '/');
-        if ($base === '') {
-            return null;
-        }
-
-        if (str_starts_with($type, 'order.')) {
-            $id = $data['order_id'] ?? null;
-            if (is_numeric($id)) {
-                return $base.'/orders/'.$id;
-            }
-        }
-
-        if (str_starts_with($type, 'payment.')) {
-            $id = $data['order_id'] ?? null;
-            if (is_numeric($id)) {
-                return $base.'/orders/'.$id;
-            }
-        }
-
-        if (str_starts_with($type, 'maintenance.')) {
-            $id = $data['maintenance_request_id'] ?? null;
-            if (is_numeric($id)) {
-                return $base.'/maintenance-requests/'.$id;
-            }
-        }
-
+        // All notifications open the notifications inbox on tap.
         return null;
     }
 

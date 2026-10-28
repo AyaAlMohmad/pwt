@@ -132,7 +132,7 @@ final class PushChannel implements NotificationChannel
      */
     private function resolveWebLink(?string $actionUrl): string
     {
-        $base = rtrim(config('app.url', ''), '/');
+        $base = rtrim(config('app.urlapp', ''), '/');
 
         if ($actionUrl === null || $actionUrl === '') {
             return $base.'/#/notifications';

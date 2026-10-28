@@ -70,7 +70,7 @@ return [
         'maintenance.created' => ['in_app'],
         'maintenance.assigned' => ['in_app', 'sms'],
         'maintenance.in_progress' => ['in_app'],
-        'maintenance.completed' => ['in_app', 'email'],
+        'maintenance.completed' => ['in_app', 'email', 'push'],
         'maintenance.cancelled' => ['in_app'],
         'support.created' => ['in_app', 'email'],
         'support.created_ops' => ['email'],
