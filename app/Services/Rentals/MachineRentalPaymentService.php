@@ -285,6 +285,7 @@ final class MachineRentalPaymentService
                 'payment_method' => $paymentCard->stripe_payment_method_id,
                 'off_session' => false, // on-session retry — customer is present
                 'confirm' => true,
+                'return_url' => rtrim(config('app.urlapp', ''), '/').'/rentals/payment-return',
                 'metadata' => [
                     'machine_rental_schedule_id' => $schedule->id,
                     'machine_rental_payment_id' => $payment->id,
