@@ -15,6 +15,7 @@ $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 use App\Enums\DeliveryStatus;
 use App\Enums\NotificationChannel;
 use App\Jobs\SendNotificationJob;
+use App\Models\User;
 use App\Models\UserDeviceToken;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,27 +23,34 @@ use Illuminate\Support\Str;
 $email = 'aya.nader.almohamad@gmail.com';
 
 // ------------------------------------------------------------------
-// 1. Find or create user Aya
+// 1. Find or create admin user Aya
 // ------------------------------------------------------------------
-$user = DB::table('users')->where('email', $email)->first();
+/** @var User|null $userModel */
+$userModel = User::query()->where('email', $email)->first();
 
-if ($user === null) {
+if ($userModel === null) {
     $userId = (string) Str::uuid();
-    DB::table('users')->insert([
+    $userModel = User::query()->create([
         'id' => $userId,
         'name' => 'Aya Nader Almohamad',
         'email' => $email,
         'mobile' => '0500000000',
         'country_code' => '+971',
         'language' => 'en',
-        'is_admin' => 0,
-        'created_at' => now(),
-        'updated_at' => now(),
+        'is_admin' => true,
     ]);
     echo "User created: {$userId}\n";
 } else {
-    $userId = $user->id;
+    $userId = $userModel->id;
     echo "User found: {$userId}\n";
+}
+
+// Ensure the user has an admin role so admin notifications reach them.
+if (! $userModel->hasRole('super_admin')) {
+    $userModel->assignRole('super_admin');
+    echo "Role assigned: super_admin\n";
+} else {
+    echo "Role already assigned: super_admin\n";
 }
 
 // ------------------------------------------------------------------
@@ -73,7 +81,7 @@ $notificationId = DB::table('notifications')->insertGetId([
     'public_id' => 'NOT-' . strtoupper(Str::random(8)),
     'user_id' => $userId,
     'channel' => NotificationChannel::Push->value,
-    'type' => 'rental.payment_due',
+    'type' => 'rental.payment_due_admin',
     'title' => json_encode([
         'en' => 'Rent due in 5 days',
         'ar' => 'الإيجار مستحق خلال 5 أيام',

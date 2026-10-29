@@ -53,8 +53,8 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
-    'urlapp' => env('APP_URLApp', 'https://staging.d2b2us4jyepbq0.amplifyapp.com'),
-    'urlappadmin' => env('APP_URLAppAdmin', 'https://admin-staging.example.com'),
+    'urlapp' => env('APP_URLApp', 'http://localhost'),
+    'urlappadmin' => env('APP_URLAppAdmin', 'http://localhost'),
 
     /*
     |--------------------------------------------------------------------------
