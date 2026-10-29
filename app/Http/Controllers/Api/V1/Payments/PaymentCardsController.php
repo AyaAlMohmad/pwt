@@ -86,6 +86,16 @@ final class PaymentCardsController extends Controller
             /** @var PaymentMethod $paymentMethod */
             $paymentMethod = PaymentMethod::retrieve($validated['payment_method_id']);
 
+            if ($user->stripe_customer_id !== null) {
+                // Verify the customer still exists in Stripe.
+                try {
+                    Customer::retrieve($user->stripe_customer_id);
+                } catch (ApiErrorException $e) {
+                    // Customer was deleted or keys changed — recreate.
+                    $user->forceFill(['stripe_customer_id' => null])->save();
+                }
+            }
+
             if ($user->stripe_customer_id === null) {
                 /** @var Customer $customer */
                 $customer = Customer::create([
