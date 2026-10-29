@@ -20,10 +20,10 @@ use App\Models\UserDeviceToken;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-$email = 'aya.nader.almohamad@gmail.com';
+$email = 'admin@pwt.local';
 
 // ------------------------------------------------------------------
-// 1. Find or create admin user Aya
+// 1. Find or create admin user
 // ------------------------------------------------------------------
 /** @var User|null $userModel */
 $userModel = User::query()->where('email', $email)->first();
@@ -32,12 +32,13 @@ if ($userModel === null) {
     $userId = (string) Str::uuid();
     $userModel = User::query()->create([
         'id' => $userId,
-        'name' => 'Aya Nader Almohamad',
+        'name' => 'Admin User',
         'email' => $email,
         'mobile' => '0500000000',
         'country_code' => '+971',
         'language' => 'en',
         'is_admin' => true,
+        'password' => bcrypt('password'),
     ]);
     echo "User created: {$userId}\n";
 } else {
@@ -46,11 +47,12 @@ if ($userModel === null) {
 }
 
 // Ensure the user has an admin role so admin notifications reach them.
-if (! $userModel->hasRole('super_admin')) {
-    $userModel->assignRole('super_admin');
-    echo "Role assigned: super_admin\n";
+$role = $userModel->hasRole('super_admin') ? 'super_admin' : 'operations';
+if (! $userModel->hasRole($role)) {
+    $userModel->assignRole($role);
+    echo "Role assigned: {$role}\n";
 } else {
-    echo "Role already assigned: super_admin\n";
+    echo "Role already assigned: {$role}\n";
 }
 
 // ------------------------------------------------------------------
