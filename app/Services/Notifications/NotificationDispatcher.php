@@ -260,12 +260,12 @@ final class NotificationDispatcher
             return rtrim((string) config('app.urlappadmin', ''), '/');
         }
 
-        // Rental payment notifications: direct link to machine payment page.
-        if (str_starts_with($type, 'rental.')) {
+        // Rental payment notifications: deep-link to machine payment page.
+        if (str_starts_with($type, 'rental.') && str_ends_with($type, '_admin') === false) {
             $machineId = $data['machine_id'] ?? null;
-            if (is_numeric($machineId)) {
-                $base = rtrim((string) config('app.urlapp', ''), '/');
-                return $base.'/#/rentals/'.$machineId.'/payment';
+            if ($machineId !== null) {
+                // Frontend SPA route: /#/machines/{machine_id}/payment
+                return '#/machines/' . $machineId . '/payment';
             }
         }
 
