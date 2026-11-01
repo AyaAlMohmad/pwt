@@ -260,6 +260,15 @@ final class NotificationDispatcher
             return rtrim((string) config('app.urlappadmin', ''), '/');
         }
 
+        // Rental payment notifications: direct link to machine payment page.
+        if (str_starts_with($type, 'rental.')) {
+            $machineId = $data['machine_id'] ?? null;
+            if (is_numeric($machineId)) {
+                $base = rtrim((string) config('app.urlapp', ''), '/');
+                return $base.'/#/rentals/'.$machineId.'/payment';
+            }
+        }
+
         // Customer notifications open the notifications inbox on tap.
         return null;
     }
