@@ -260,16 +260,13 @@ final class NotificationDispatcher
             return rtrim((string) config('app.urlappadmin', ''), '/');
         }
 
-        // Rental payment notifications: deep-link to machine payment page.
-        if (str_starts_with($type, 'rental.') && str_ends_with($type, '_admin') === false) {
-            $machineId = $data['machine_id'] ?? null;
-            if ($machineId !== null) {
-                // Frontend SPA route: /#/machines/{machine_id}/payment
-                return '#/machines/' . $machineId . '/payment';
-            }
+        // Customer notifications: rental.payment_failed should open the notifications page
+        // with the payment link (handled by frontend). For now, return the specific URL.
+        if ($type === 'rental.payment_failed') {
+            return 'https://test.d2b2us4jyepbq0.amplifyapp.com/#/notifications';
         }
 
-        // Customer notifications open the notifications inbox on tap.
+        // All other customer notifications open the notifications inbox on tap.
         return null;
     }
 
