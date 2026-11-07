@@ -53,23 +53,8 @@ foreach ($top as $t => $c) {
 }
 
 // ------------------------------------------------------------------
-// Confirm
+// Execute immediately — the script name makes the intent explicit.
 // ------------------------------------------------------------------
-$force = in_array('--force', $argv ?? [], true);
-
-if (! $force) {
-    echo "\n⚠️  WARNING: This will DELETE ALL notifications permanently.\n";
-    echo "Run with --force to confirm, or type 'yes' below:\n";
-    echo "Type 'yes' to continue: ";
-    $handle = fopen('php://stdin', 'r');
-    $line = fgets($handle);
-    fclose($handle);
-
-    if (trim($line) !== 'yes') {
-        echo "Aborted.\n";
-        exit(1);
-    }
-}
 
 // ------------------------------------------------------------------
 // Delete

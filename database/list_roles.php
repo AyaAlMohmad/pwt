@@ -1,7 +1,7 @@
 <?php
 
 /**
- * List all roles and their assigned users.
+ * List all role names only.
  *
  * Usage:
  *   php database/list_roles.php
@@ -14,32 +14,16 @@ $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
 use Illuminate\Support\Facades\DB;
 
-$roles = DB::table('roles')->orderBy('name')->get();
+$roles = DB::table('roles')->orderBy('name')->pluck('name');
 
 if ($roles->isEmpty()) {
     echo "No roles found.\n";
     exit(0);
 }
 
+echo "=== Available Roles ===\n";
 foreach ($roles as $role) {
-    echo "\n=== Role: {$role->name} ===\n";
-
-    $users = DB::table('users')
-        ->join('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
-        ->where('model_has_roles.role_id', $role->id)
-        ->where('model_has_roles.model_type', 'App\Models\User')
-        ->select('users.id', 'users.name', 'users.email', 'users.is_admin')
-        ->get();
-
-    if ($users->isEmpty()) {
-        echo "  (no users)\n";
-        continue;
-    }
-
-    foreach ($users as $user) {
-        $adminBadge = $user->is_admin ? ' [ADMIN]' : '';
-        echo "  - {$user->name} ({$user->email}){$adminBadge}\n";
-    }
+    echo "  - {$role}\n";
 }
 
 echo "\nDone.\n";

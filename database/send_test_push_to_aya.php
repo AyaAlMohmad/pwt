@@ -20,7 +20,7 @@ use App\Models\UserDeviceToken;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-$testToken = 'elr0VLwW80TTY_To4tpc0:APA91bTfzePJN0DH3vBSiR-Gem16xRiBXDS4ToSV_z39kCbiU7izzAPrW1ygn0tctQMQV4w-XldGHo_FhaTIZ-KBzbahpUqigsbwi1ZmrlDhiGFMpT7VFRV';
+$testToken = 'euePm9K5um2BblgiKoQy6E:APA91bHQFQAmvAPlR-uaGPwAfnOBi9FnaSJBMAfdUJNkFoHdC4txcPRrC_-ngH8umB1-srHir-9z3GSUthxek9SS2B9pvEMfcqjm1YrVWgN3pnGGW9opHyQ';
 
 // ------------------------------------------------------------------
 // Helper: find/create user and register token
@@ -67,7 +67,7 @@ function registerToken(User $user, string $token): void
         ],
         [
             'platform' => 'web',
-            'device_name' => 'Firefox on Windows',
+            'device_name' => 'Chrome on macOS',
             'app_version' => '1.0.0',
             'is_active' => true,
             'last_used_at' => now(),
