@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\DeliveryStatus;
+use App\Enums\MachineRentalPaymentStatus;
 use App\Enums\NotificationChannel;
 use Database\Factories\NotificationFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -126,6 +127,22 @@ final class Notification extends Model
     public function scopeByType(Builder $query, string $type): Builder
     {
         return $query->where('type', $type);
+    }
+
+    public function getActionUrlAttribute(?string $value): ?string
+    {
+        $paymentId = $this->data['payment_id'] ?? null;
+
+        if ($value !== null && $this->type === 'rental.payment_failed' && $paymentId !== null
+            && MachineRentalPayment::query()
+                ->whereKey($paymentId)
+                ->where('user_id', $this->user_id)
+                ->where('status', MachineRentalPaymentStatus::Paid->value)
+                ->exists()) {
+            return null;
+        }
+
+        return $value;
     }
 
     protected static function newFactory(): NotificationFactory

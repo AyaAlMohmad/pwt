@@ -44,6 +44,25 @@ final class GenericNotificationMail extends Mailable implements ShouldQueue
         $title = (string) $this->notification->getTranslation('title', $locale);
         $body = (string) $this->notification->getTranslation('body', $locale);
 
+        if ($this->notification->type === 'rental.payment_failed') {
+            $data = $this->notification->data ?? [];
+
+            return new Content(
+                view: 'emails.rental-payment-failed',
+                with: [
+                    'details' => [
+                        'customer_name' => ($data['customer_name'] ?? '') ?: ($this->notification->user?->name ?? 'Customer'),
+                        'machine_name' => $data['machine_name'] ?? 'PWT water dispenser',
+                        'machine_id' => $data['machine_id'] ?? '—',
+                        'amount' => $data['amount'] ?? 0,
+                        'currency' => $data['currency'] ?? 'AED',
+                        'failure_reason' => ! empty($data['customer_reason']) ? $data['customer_reason'] : 'We could not process your payment. Please review your payment method.',
+                        'payment_url' => $this->notification->action_url,
+                    ],
+                ],
+            );
+        }
+
         return new Content(
             view: 'emails.notification',
             with: [

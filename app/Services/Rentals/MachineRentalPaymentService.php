@@ -238,6 +238,13 @@ final class MachineRentalPaymentService
         MachineRentalSchedule $schedule,
         ?PaymentCard $overrideCard = null,
     ): array {
+        if ($schedule->last_payment_at !== null && $schedule->next_payment_due_at->isAfter(today())) {
+            return [
+                'status' => 'already_paid',
+                'next_due_date' => $schedule->next_payment_due_at->toDateString(),
+            ];
+        }
+
         $paymentCard = $overrideCard ?? $schedule->paymentCard;
 
         if ($paymentCard === null || $paymentCard->stripe_payment_method_id === null || $paymentCard->stripe_payment_method_id === '') {
