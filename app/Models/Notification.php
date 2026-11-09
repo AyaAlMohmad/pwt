@@ -133,11 +133,31 @@ final class Notification extends Model
     {
         $paymentId = $this->data['payment_id'] ?? null;
 
-        if ($value !== null && $this->type === 'rental.payment_failed' && $paymentId !== null
+        if ($value === null || $this->type !== 'rental.payment_failed' || $paymentId === null) {
+            return $value;
+        }
+
+        $payment = MachineRentalPayment::query()
+            ->whereKey($paymentId)
+            ->where('user_id', $this->user_id)
+            ->first();
+
+        if ($payment === null) {
+            return $value;
+        }
+
+        if ($payment->status === MachineRentalPaymentStatus::Paid) {
+            return null;
+        }
+
+        if ($payment->machine_rental_schedule_id !== null && $payment->due_date !== null
             && MachineRentalPayment::query()
-                ->whereKey($paymentId)
                 ->where('user_id', $this->user_id)
+                ->where('machine_rental_schedule_id', $payment->machine_rental_schedule_id)
+                ->where('machine_id', $payment->machine_id)
+                ->whereDate('due_date', $payment->due_date->toDateString())
                 ->where('status', MachineRentalPaymentStatus::Paid->value)
+                ->when($payment->created_at !== null, fn ($query) => $query->where('paid_at', '>=', $payment->created_at))
                 ->exists()) {
             return null;
         }

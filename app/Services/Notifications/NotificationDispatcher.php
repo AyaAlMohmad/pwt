@@ -260,10 +260,15 @@ final class NotificationDispatcher
             return rtrim((string) config('app.urlappadmin', ''), '/');
         }
 
-        // Customer notifications: rental.payment_failed should open the notifications page
-        // with the payment link (handled by frontend). For now, return the specific URL.
+        // Customer notifications: rental.payment_failed opens the dedicated
+        // rental payment page (not a popup). The page reads machine_name,
+        // amount, and currency from the notification's `data` payload so it
+        // can render the amount due without needing /me/machines.
         if ($type === 'rental.payment_failed') {
-            return 'https://test.d2b2us4jyepbq0.amplifyapp.com/#/notifications';
+            $base = rtrim((string) config('app.urlapp', ''), '/');
+            $machineId = (int) ($data['machine_id'] ?? 0);
+
+            return $base.'/#/rentals/pay?machine_id='.$machineId;
         }
 
         // All other customer notifications open the notifications inbox on tap.
