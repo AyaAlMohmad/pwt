@@ -27,8 +27,8 @@ it('renders the rental failure design with safe customer data and the existing a
     $mail = new GenericNotificationMail($notification);
     $html = $mail->render();
 
-    expect($html)->toContain('PURE WATER TECHNOLOGY', 'Rental Payment Unsuccessful', 'Payment Summary', 'AED 150.50', 'Water dispenser - #42', 'Your card was declined.', 'https://example.com/notifications/payment', 'Review Payment Details')
-        ->not->toContain('private_gateway_debug', '<script>');
+    expect($html)->toContain('PWT Mega Tech', 'Rental Payment Unsuccessful', 'Payment Summary', 'AED 150.50', 'Water dispenser - #42', 'Your card was declined.', 'https://example.com/notifications/payment', 'Review Payment Details')
+        ->not->toContain('private_gateway_debug', '<script>', 'PURE WATER TECHNOLOGY');
 });
 
 it('renders missing rental details safely without querying a recipient', function () {

@@ -23,8 +23,16 @@
 <tr><td align="center" class="email-outer" style="padding:36px 14px 48px;">
     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;width:100%;background-color:#ffffff;border-collapse:separate;border-spacing:0;border:1px solid #e4e9f0;border-radius:16px;overflow:hidden;">
         <tr><td align="center" class="email-header" style="background-color:#203c63;padding:34px 20px 31px;">
-            <div style="color:#ffffff;font-weight:700;font-size:28px;line-height:1.25;letter-spacing:0.2px;">PWT Mega Tech</div>
-            <div style="color:#d8e4f1;font-size:13px;letter-spacing:1px;line-height:1.5;padding-top:7px;">PURE WATER TECHNOLOGY</div>
+            <table role="presentation" align="center" dir="ltr" border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td valign="middle" style="padding-right:16px;vertical-align:middle;">
+                        <img src="{{ $message->embed(public_path('logo-email.png')) }}" alt="PWT Mega Technologies" width="52" style="display:block;width:52px;height:auto;border:0;">
+                    </td>
+                    <td valign="middle" style="text-align:left;vertical-align:middle;">
+                        <div style="color:#ffffff;font-weight:700;font-size:28px;line-height:1.25;letter-spacing:0.2px;">PWT Mega Tech</div>
+                    </td>
+                </tr>
+            </table>
         </td></tr>
         <tr><td bgcolor="#60b9d5" height="4" style="height:4px;font-size:1px;line-height:1px;background-color:#60b9d5;">&nbsp;</td></tr>
         <tr><td class="email-content" style="padding:32px 40px 35px;">
